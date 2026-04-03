@@ -60,7 +60,7 @@
           <table class="device-table file-query-fixed-table">
             <colgroup>
               <col v-for="col in fileQueryColumns" :key="col.key" :style="{ width: col.width }" />
-              <col style="width:130px" />
+              <col style="width:110px" />
             </colgroup>
             <thead>
               <tr>
@@ -84,6 +84,12 @@
               <tr v-for="(row, i) in fileQueryPagedData" :key="i">
                 <td v-for="col in fileQueryColumns" :key="col.key">
                   <button v-if="col.key === 'payloadInfo'" class="payload-btn" @click="openPayloadModal(row)">查看载荷</button>
+                  <template v-else-if="col.key === 'locationLatLon'">
+                    <div class="latlon-cell">
+                      <span class="latlon-text">{{ row.locationLatLon || '-' }}</span>
+                      <button v-if="row.locationLatLon" class="location-view-btn" @click="openLocationPreview(row)">查看</button>
+                    </div>
+                  </template>
                   <template v-else>{{ row[col.key] }}</template>
                 </td>
                 <td>
@@ -229,7 +235,12 @@
                 <td>{{ row.endTime }}</td>
                 <td>{{ row.duration }}</td>
                 <td>{{ row.imei }}</td>
-                <td>{{ row.locationLatLon }}</td>
+                <td>
+                  <div class="latlon-cell">
+                    <span class="latlon-text">{{ row.locationLatLon || '-' }}</span>
+                    <button v-if="row.locationLatLon" class="location-view-btn" @click="openLocationPreview(row)">查看</button>
+                  </div>
+                </td>
                 <td><button class="payload-btn" @click="openPayloadModal(row)">查看载荷</button></td>
                 <td>
                   <div class="detail-actions">
@@ -256,6 +267,19 @@
         </div>
         <div class="trajectory-modal-body">
           <div id="trajectoryMap" style="width:100%;height:100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 定位预览弹窗 -->
+    <div v-if="showLocationModal" class="trajectory-modal-overlay" @click.self="closeLocationPreview">
+      <div class="trajectory-modal location-preview-modal">
+        <div class="trajectory-modal-header">
+          <span>定位预览 - {{ locationPreviewLatLon }}</span>
+          <button class="trajectory-modal-close" @click="closeLocationPreview">&times;</button>
+        </div>
+        <div class="trajectory-modal-body">
+          <div id="locationPreviewMap" style="width:100%;height:100%;"></div>
         </div>
       </div>
     </div>
@@ -474,6 +498,9 @@ const showTrajectoryModal = ref(false)
 const trajectoryTerminalId = ref('')
 const trajectoryTimeRange = ref('')
 let trajectoryMap = null
+const showLocationModal = ref(false)
+const locationPreviewLatLon = ref('')
+let locationPreviewMap = null
 
 // 内容查询参数
 const fileQueryStartTime = ref('')
@@ -499,13 +526,13 @@ const fileQueryPageSize = 50
 
 const fileQueryColumns = [
   { key: 'deviceNumber', label: '设备编号', width: '65px' },
-  { key: 'chainID', label: '识别码', width: '160px' },
-  { key: 'startTime', label: '通信起始时间', width: '140px' },
-  { key: 'endTime', label: '通信截止时间', width: '140px' },
-  { key: 'duration', label: '通信时长(秒)', width: '85px' },
-  { key: 'imei', label: 'IMEI', width: '120px' },
-  { key: 'locationLatLon', label: '定位经纬度', width: '160px' },
-  { key: 'payloadInfo', label: '载荷信息', width: '80px', noFilter: true },
+  { key: 'chainID', label: '识别码', width: '145px' },
+  { key: 'startTime', label: '通信起始时间', width: '130px' },
+  { key: 'endTime', label: '通信截止时间', width: '130px' },
+  { key: 'duration', label: '通信时长(秒)', width: '78px' },
+  { key: 'imei', label: 'IMEI', width: '110px' },
+  { key: 'locationLatLon', label: '定位经纬度', width: '180px' },
+  { key: 'payloadInfo', label: '载荷信息', width: '74px', noFilter: true },
 ]
 
 // 列筛选状态：每列一个 Set，空 Set 表示不过滤
@@ -636,7 +663,7 @@ const fileQueryFilteredData = computed(() => {
     if (payloadFilterAircraft.value && !(d.acars?.length > 0)) return false
     if (payloadFilterVoice.value && !(d.voiceWavs?.length > 0)) return false
     if (payloadFilterSms.value && !(d.sms?.length > 0)) return false
-    if (payloadFilterIp.value && !(d.ipData?.length > 0)) return false
+    if (payloadFilterIp.value && !d.isIp) return false
     if (payloadFilterLowSpeed.value && !d.isLowSpeedData) return false
     if (payloadFilterIdapp.value && !d.parsedData) return false
 
@@ -772,10 +799,85 @@ function getChainIdFromItem(item) {
 function formatLocationLatLon(item) {
   const lat = item?.['定位经纬度Lat'] ?? item?.定位经纬度Lat ?? item?.locationLat ?? item?.LocationLat ?? item?.lat ?? item?.Lat
   const lon = item?.['定位经纬度Lon'] ?? item?.定位经纬度Lon ?? item?.locationLon ?? item?.LocationLon ?? item?.lon ?? item?.Lon
-  if (lat !== undefined && lat !== null && lon !== undefined && lon !== null && String(lat).trim() !== '' && String(lon).trim() !== '') {
-    return `${lat}, ${lon}`
+
+  const latText = String(lat ?? '').trim()
+  const lonText = String(lon ?? '').trim()
+  if (latText && lonText) {
+    const latNum = Number(latText)
+    const lonNum = Number(lonText)
+    if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
+      if (latNum === 0 && lonNum === 0) return ''
+      return `${latNum.toFixed(6)}, ${lonNum.toFixed(6)}`
+    }
+    return `${latText}, ${lonText}`
   }
-  return String(item?.locationLatLon ?? item?.LocationLatLon ?? '').trim()
+
+  const fallback = String(item?.locationLatLon ?? item?.LocationLatLon ?? '').trim()
+  if (!fallback) return ''
+  const parts = fallback.split(/[,\s，]+/).filter(Boolean)
+  if (parts.length >= 2) {
+    const latNum = Number(parts[0])
+    const lonNum = Number(parts[1])
+    if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
+      if (latNum === 0 && lonNum === 0) return ''
+      return `${latNum.toFixed(6)}, ${lonNum.toFixed(6)}`
+    }
+  }
+  return fallback
+}
+
+function parseLatLonText(text) {
+  const parts = String(text || '')
+    .split(/[,\s，]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+  if (parts.length < 2) return null
+  const lat = Number(parts[0])
+  const lon = Number(parts[1])
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+  if (lat === 0 && lon === 0) return null
+  return { lat, lon }
+}
+
+function openLocationPreview(row) {
+  const parsed = parseLatLonText(row?.locationLatLon)
+  if (!parsed) return
+
+  locationPreviewLatLon.value = `${parsed.lat.toFixed(6)}, ${parsed.lon.toFixed(6)}`
+  showLocationModal.value = true
+
+  nextTick(() => {
+    if (locationPreviewMap) {
+      locationPreviewMap.remove()
+      locationPreviewMap = null
+    }
+
+    locationPreviewMap = L.map('locationPreviewMap', {
+      center: [parsed.lat, parsed.lon],
+      zoom: 12,
+      zoomControl: true
+    })
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(locationPreviewMap)
+
+    L.marker([parsed.lat, parsed.lon]).addTo(locationPreviewMap)
+      .bindPopup(`<b>定位点</b><br>纬度: ${parsed.lat.toFixed(6)}<br>经度: ${parsed.lon.toFixed(6)}`)
+      .openPopup()
+
+    setTimeout(() => {
+      if (locationPreviewMap) locationPreviewMap.invalidateSize()
+    }, 120)
+  })
+}
+
+function closeLocationPreview() {
+  showLocationModal.value = false
+  if (locationPreviewMap) {
+    locationPreviewMap.remove()
+    locationPreviewMap = null
+  }
 }
 
 function calcDuration(start, end) {
@@ -1405,6 +1507,10 @@ onUnmounted(() => {
   if (countdownTimer) clearInterval(countdownTimer)
   if (deviceRefreshTimer) clearInterval(deviceRefreshTimer)
   document.removeEventListener('click', handleGlobalClick)
+  if (locationPreviewMap) {
+    locationPreviewMap.remove()
+    locationPreviewMap = null
+  }
 })
 
 // 位置展示 - 查询（使用 SearchCoordinate 接口）
@@ -1581,6 +1687,16 @@ function normalizeParsedData(raw) {
 // 提取结构化载荷数据
 function extractPayloadData(item) {
   const parsed = normalizeParsedData(item.payloadData ?? item.PayloadData ?? item.IdappRawLine ?? item.idappRawLine)
+  const rawIsIp =
+    item?.isIp ??
+    item?.IsIp ??
+    item?.IsIP ??
+    item?.['isIp'] ??
+    item?.['IsIp'] ??
+    item?.['IsIP'] ??
+    item?.['isIP数据'] ??
+    item?.['IsIP数据'] ??
+    item?.['IP数据']
   return {
     commType:   toArr(item.commType),
     signaling:  toArr(item['信令类型']),
@@ -1590,6 +1706,7 @@ function extractPayloadData(item) {
     ira:        toArr(item.ira ?? item.IRA),
     sms:        toArr(item.sms ?? item.Sms ?? item.SMS),
     ipData:     toArr(item.ipData ?? item.IPData ?? item.IpData ?? item.IpRawLine ?? item.ipRawLine),
+    isIp:       rawIsIp === true || rawIsIp === 1 || String(rawIsIp ?? '').toLowerCase() === 'true' || String(rawIsIp ?? '') === '1',
     voiceWavs:  toArr(item.VoiceWavs ?? item.voiceWavs),
     voiceInfo:  (item.VoiceInfo ?? item.voiceInfo ?? '').trim(),
     parsedData: parsed.text,
@@ -2539,7 +2656,7 @@ tbody tr:hover {
 }
 .file-query-fixed-table {
   table-layout: fixed;
-  width: 1080px;
+  width: 1020px;
 }
 /* 实时位置搴曢儴閫氫俊浜嬩欢琛?*/
 .table-panel .device-table { table-layout: fixed; width: 100%; }
@@ -2549,9 +2666,9 @@ tbody tr:hover {
 .table-panel .device-table th:nth-child(4), .table-panel .device-table td:nth-child(4) { width: 140px; }
 .table-panel .device-table th:nth-child(5), .table-panel .device-table td:nth-child(5) { width: 85px; }
 .table-panel .device-table th:nth-child(6), .table-panel .device-table td:nth-child(6) { width: 120px; }
-.table-panel .device-table th:nth-child(7), .table-panel .device-table td:nth-child(7) { width: 170px; }
+.table-panel .device-table th:nth-child(7), .table-panel .device-table td:nth-child(7) { width: 190px; }
 .table-panel .device-table th:nth-child(8), .table-panel .device-table td:nth-child(8) { width: 80px; }
-.table-panel .device-table th:nth-child(9), .table-panel .device-table td:nth-child(9) { width: 130px; }
+.table-panel .device-table th:nth-child(9), .table-panel .device-table td:nth-child(9) { width: 120px; }
 
 .device-table th {
   position: sticky;
@@ -2760,6 +2877,10 @@ tbody tr:hover {
   flex-direction: column;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
+.location-preview-modal {
+  width: 94vw;
+  height: 90vh;
+}
 .trajectory-modal-header {
   display: flex;
   align-items: center;
@@ -2806,6 +2927,35 @@ tbody tr:hover {
 }
 .payload-btn:hover {
   background: #096dd9;
+}
+.latlon-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.latlon-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.location-view-btn {
+  padding: 1px 6px;
+  background: #fff;
+  color: #1890ff;
+  border: 1px solid #91caff;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.location-view-btn:hover {
+  color: #096dd9;
+  border-color: #69b1ff;
+  background: #e6f4ff;
 }
 .payload-modal {
   background: #fff;

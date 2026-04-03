@@ -179,34 +179,120 @@
 
       <!-- 软件控制 - 设备信息页-->
       <section v-if="activeMenu === 3" class="device-page">
-        <div class="device-table-wrapper">
-          <table class="device-table">
-            <thead>
-              <tr>
-                <th>设备名称</th>
-                <th>更新时间</th>
-                <th>已工作时间</th>
-                <th>磁盘已用/总量(GB)</th>
-                <th>磁盘剩余(GB)</th>
-                <th>CPU使用率(%)</th>
-                <th>自组网</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(dev, i) in deviceList" :key="i">
-                <td><span class="status-light" :class="dev.isOnline ? 'online' : 'offline'"></span>{{ dev.name }}</td>
-                <td>{{ dev.lastWorkedTime }}</td>
-                <td>{{ dev.workedTime }}</td>
-                <td>{{ dev.diskUsedGB }} / {{ dev.diskTotalGB }}</td>
-                <td>{{ dev.diskAvailGB }}</td>
-                <td :class="{ 'cpu-high': dev.cpuUsagePercent > 80 }">{{ dev.cpuUsagePercent }}</td>
-                <td><button class="mesh-btn" @click="openMeshPage(i + 1)">前往自组网</button></td>
-              </tr>
-              <tr v-if="deviceList.length === 0">
-                <td colspan="7" class="empty-row">暂无数据</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="device-section device-config-section">
+          <div class="device-section-header">
+            <div>
+              <div class="device-section-title">设备配置</div>
+            </div>
+            <div class="device-config-toolbar">
+              <button class="query-btn" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice" @click="handleSaveDeviceConfig">
+                {{ deviceConfigSaving ? '保存中...' : '保存配置' }}
+              </button>
+              <button class="danger-btn" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice" @click="handleReboot">
+                {{ rebootingDevice ? '重启中...' : '设备重启' }}
+              </button>
+              <button class="danger-btn danger-btn-secondary" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice || shuttingDownDevice" @click="handleShutdown">
+                {{ shuttingDownDevice ? '关机中...' : '设备关机' }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="deviceConfigMessage"
+            class="device-config-message"
+            :class="`device-config-message-${deviceConfigMessageType}`"
+          >
+            {{ deviceConfigMessage }}
+          </div>
+
+          <div class="device-config-grid">
+            <div class="device-config-field">
+              <span class="device-config-label">设备编号</span>
+              <input class="device-config-input" :value="deviceConfigMeta.deviceGuid || '-'" type="text" readonly />
+            </div>
+
+            <label class="device-config-field">
+              <span class="device-config-label">是否是中心节点</span>
+              <div class="device-switch-row">
+                <label class="device-switch">
+                  <input v-model="deviceConfigForm.isCenterNode" type="checkbox" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice" />
+                  <span class="device-switch-slider"></span>
+                </label>
+                <span class="device-switch-text">{{ deviceConfigForm.isCenterNode ? '是' : '否' }}</span>
+              </div>
+            </label>
+
+            <div class="device-config-field">
+              <span class="device-config-label">主节点 IP</span>
+              <input
+                v-model.trim="deviceConfigForm.device1IP"
+                class="device-config-input"
+                type="text"
+                placeholder="对应 Device1IP"
+                :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice"
+              />
+            </div>
+
+            <div class="device-config-field">
+              <span class="device-config-label">从节点2 IP</span>
+              <input
+                v-model.trim="deviceConfigForm.device2IP"
+                class="device-config-input"
+                type="text"
+                placeholder="对应 Device2IP"
+                :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice"
+              />
+            </div>
+
+            <div class="device-config-field">
+              <span class="device-config-label">从节点3 IP</span>
+              <input
+                v-model.trim="deviceConfigForm.device3IP"
+                class="device-config-input"
+                type="text"
+                placeholder="对应 Device3IP"
+                :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="device-section device-card-section">
+          <div class="device-section-header">
+            <div>
+              <div class="device-section-title">设备运行信息</div>
+              <div class="device-section-desc">展示当前三台设备的在线状态、资源占用与自组网入口。</div>
+            </div>
+          </div>
+          <div class="device-table-wrapper">
+            <table class="device-table">
+              <thead>
+                <tr>
+                  <th>设备名称</th>
+                  <th>更新时间</th>
+                  <th>已工作时间</th>
+                  <th>磁盘已用/总量(GB)</th>
+                  <th>磁盘剩余(GB)</th>
+                  <th>CPU使用率(%)</th>
+                  <th>自组网</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(dev, i) in deviceList" :key="i">
+                  <td><span class="status-light" :class="dev.isOnline ? 'online' : 'offline'"></span>{{ dev.name }}</td>
+                  <td>{{ dev.lastWorkedTime }}</td>
+                  <td>{{ dev.workedTime }}</td>
+                  <td>{{ dev.diskUsedGB }} / {{ dev.diskTotalGB }}</td>
+                  <td>{{ dev.diskAvailGB }}</td>
+                  <td :class="{ 'cpu-high': dev.cpuUsagePercent > 80 }">{{ dev.cpuUsagePercent }}</td>
+                  <td><button class="mesh-btn" @click="openMeshPage(i + 1)">前往自组网</button></td>
+                </tr>
+                <tr v-if="deviceList.length === 0">
+                  <td colspan="7" class="empty-row">暂无数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -704,6 +790,22 @@ const deviceList = ref([
   { name: 'Device2', isOnline: false, ip: '', lastWorkedTime: '', workedTime: '', diskUsedGB: '0.00', diskTotalGB: '0.00', diskAvailGB: '0.00', cpuUsagePercent: 0 },
   { name: 'Device3', isOnline: false, ip: '', lastWorkedTime: '', workedTime: '', diskUsedGB: '0.00', diskTotalGB: '0.00', diskAvailGB: '0.00', cpuUsagePercent: 0 },
 ])
+const deviceConfigForm = reactive({
+  isCenterNode: false,
+  device1IP: '',
+  device2IP: '',
+  device3IP: '',
+})
+const deviceConfigMeta = reactive({
+  deviceGuid: '',
+})
+const deviceConfigRaw = ref(null)
+const deviceConfigLoading = ref(false)
+const deviceConfigSaving = ref(false)
+const rebootingDevice = ref(false)
+const shuttingDownDevice = ref(false)
+const deviceConfigMessage = ref('')
+const deviceConfigMessageType = ref('info')
 let deviceRefreshTimer = null
 
 // 加载状态
@@ -773,6 +875,11 @@ function formatWorkedTime(val) {
 function bytesToGB(bytes) {
   if (!bytes && bytes !== 0) return '0.00'
   return (bytes / (1024 ** 3)).toFixed(2)
+}
+
+function setDeviceConfigMessage(message, type = 'info') {
+  deviceConfigMessage.value = message
+  deviceConfigMessageType.value = type
 }
 
 function formatDisplay(dateStr) {
@@ -1467,7 +1574,9 @@ watch(activeMenu, (val) => {
     nextTick(() => { if (map) map.invalidateSize() })
     if (!searchStartTime.value) initSearchTime()
   } else if (val === 3) {
+    setDeviceConfigMessage('')
     fetchDeviceInfo()
+    fetchDeviceConfiguration()
     deviceRefreshTimer = setInterval(fetchDeviceInfo, 120000)
   }
 })
@@ -1580,6 +1689,148 @@ async function fetchDeviceInfo() {
     })
   } catch (err) {
     console.error('获取设备信息失败:', err)
+  }
+}
+
+function applyDeviceConfiguration(data) {
+  deviceConfigRaw.value = data ? { ...data } : null
+  deviceConfigMeta.deviceGuid = data?.deviceGuid || ''
+  deviceConfigForm.isCenterNode = !!data?.isCenterNode
+  deviceConfigForm.device1IP = data?.device1IP || ''
+  deviceConfigForm.device2IP = data?.device2IP || ''
+  deviceConfigForm.device3IP = data?.device3IP || ''
+}
+
+async function fetchDeviceConfiguration() {
+  deviceConfigLoading.value = true
+  try {
+    const resp = await fetch('/api/Configuration/Get')
+    const text = await resp.text()
+    if (!text) {
+      setDeviceConfigMessage('未获取到设备配置数据。', 'warning')
+      return
+    }
+    const result = JSON.parse(text)
+    if (result?.status !== undefined && result.status !== 1) {
+      throw new Error(result?.message || '获取设备配置失败')
+    }
+    const data = result?.data || result
+    applyDeviceConfiguration(data)
+    setDeviceConfigMessage('设备配置已加载。', 'success')
+  } catch (err) {
+    console.error('获取设备配置失败:', err)
+    setDeviceConfigMessage(`获取设备配置失败：${err?.message || err}`, 'error')
+  } finally {
+    deviceConfigLoading.value = false
+  }
+}
+
+function buildDeviceConfigPayload() {
+  const base = deviceConfigRaw.value ? { ...deviceConfigRaw.value } : {}
+  return {
+    ...base,
+    deviceGuid: deviceConfigMeta.deviceGuid || base.deviceGuid || '',
+    isCenterNode: !!deviceConfigForm.isCenterNode,
+    device1IP: deviceConfigForm.device1IP.trim(),
+    device2IP: deviceConfigForm.device2IP.trim(),
+    device3IP: deviceConfigForm.device3IP.trim(),
+  }
+}
+
+async function postDeviceConfiguration(payload) {
+  const endpoints = [
+    '/api/Configuration/Set',
+    '/api/Configuration/Update',
+    '/api/Configuration/Save',
+  ]
+  let lastError = null
+
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+      if (!resp.ok) {
+        lastError = new Error(`${url} 返回 ${resp.status}`)
+        continue
+      }
+
+      const text = await resp.text()
+      if (!text) return
+      const result = JSON.parse(text)
+      if (result?.status !== undefined && result.status !== 1) {
+        throw new Error(result?.message || `${url} 保存失败`)
+      }
+      return
+    } catch (err) {
+      lastError = err
+    }
+  }
+
+  throw lastError || new Error('保存配置失败')
+}
+
+async function handleSaveDeviceConfig() {
+  const payload = buildDeviceConfigPayload()
+  deviceConfigSaving.value = true
+  setDeviceConfigMessage('正在保存设备配置...', 'info')
+
+  try {
+    await postDeviceConfiguration(payload)
+    deviceConfigRaw.value = { ...payload }
+    setDeviceConfigMessage('设备配置已保存。', 'success')
+    await fetchDeviceConfiguration()
+  } catch (err) {
+    console.error('保存设备配置失败:', err)
+    setDeviceConfigMessage(`保存设备配置失败：${err?.message || err}`, 'error')
+  } finally {
+    deviceConfigSaving.value = false
+  }
+}
+
+async function handleReboot() {
+  const ok = window.confirm('确认要重启设备吗？该操作会中断当前设备服务。')
+  if (!ok) return
+
+  rebootingDevice.value = true
+  setDeviceConfigMessage('正在发送重启指令...', 'warning')
+
+  try {
+    const resp = await fetch('/api/Execution/Reboot', { method: 'POST' })
+    if (!resp.ok) {
+      throw new Error(`重启接口返回 ${resp.status}`)
+    }
+    setDeviceConfigMessage('重启指令已发送。设备可能会暂时离线，请稍后刷新查看。', 'success')
+  } catch (err) {
+    console.error('设备重启失败:', err)
+    setDeviceConfigMessage(`设备重启失败：${err?.message || err}`, 'error')
+  } finally {
+    rebootingDevice.value = false
+  }
+}
+
+async function handleShutdown() {
+  const ok = window.confirm('确认要关闭设备吗？设备关机后需要人工重新开机。')
+  if (!ok) return
+
+  shuttingDownDevice.value = true
+  setDeviceConfigMessage('正在发送关机指令...', 'warning')
+
+  try {
+    const resp = await fetch('/api/Execution/Close', { method: 'POST' })
+    if (!resp.ok) {
+      throw new Error(`关机接口返回 ${resp.status}`)
+    }
+    setDeviceConfigMessage('关机指令已发送。设备可能会很快离线。', 'success')
+  } catch (err) {
+    console.error('设备关机失败:', err)
+    setDeviceConfigMessage(`设备关机失败：${err?.message || err}`, 'error')
+  } finally {
+    shuttingDownDevice.value = false
   }
 }
 
@@ -2635,10 +2886,46 @@ tbody tr:hover {
   padding: 24px;
   overflow: auto;
   background: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .device-bar {
   margin-bottom: 12px;
+}
+
+.device-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.device-card-section,
+.device-config-section {
+  padding: 18px 20px 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.device-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.device-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.device-section-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .device-table-wrapper {
@@ -2740,6 +3027,200 @@ tbody tr:hover {
 .mesh-btn:hover {
   background: linear-gradient(135deg, #40a9ff, #1890ff);
   box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
+}
+
+.device-config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.device-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.device-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.device-config-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.device-config-input {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #2c3e50;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.device-config-input:hover {
+  border-color: #b0b0b0;
+}
+
+.device-config-input:focus {
+  outline: none;
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
+}
+
+.device-config-input[readonly] {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.device-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.device-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 52px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.device-switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.device-switch-slider {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: #dbe2ea;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.device-switch-slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  transition: transform 0.2s ease;
+}
+
+.device-switch input:checked + .device-switch-slider {
+  background: linear-gradient(135deg, #1890ff, #096dd9);
+  box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.14);
+}
+
+.device-switch input:checked + .device-switch-slider::after {
+  transform: translateX(22px);
+}
+
+.device-switch input:focus-visible + .device-switch-slider {
+  outline: 2px solid rgba(24, 144, 255, 0.28);
+  outline-offset: 2px;
+}
+
+.device-switch input:disabled + .device-switch-slider {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.device-switch-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  min-width: 18px;
+}
+
+.device-config-message {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+
+.device-config-message-info {
+  background: #e6f4ff;
+  border-color: #91caff;
+  color: #0958d9;
+}
+
+.device-config-message-success {
+  background: #f6ffed;
+  border-color: #b7eb8f;
+  color: #389e0d;
+}
+
+.device-config-message-warning {
+  background: #fffbe6;
+  border-color: #ffe58f;
+  color: #d48806;
+}
+
+.device-config-message-error {
+  background: #fff1f0;
+  border-color: #ffa39e;
+  color: #cf1322;
+}
+
+.danger-btn {
+  height: 34px;
+  padding: 0 22px;
+  background: linear-gradient(135deg, #ff7875, #cf1322);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(207, 19, 34, 0.22);
+  transition: all 0.2s;
+}
+
+.danger-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff9c99, #f5222d);
+  box-shadow: 0 4px 10px rgba(207, 19, 34, 0.28);
+}
+
+.danger-btn-secondary {
+  background: linear-gradient(135deg, #ff7875, #cf1322);
+  box-shadow: 0 2px 6px rgba(207, 19, 34, 0.22);
+}
+
+.danger-btn-secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff9c99, #f5222d);
+  box-shadow: 0 4px 10px rgba(207, 19, 34, 0.28);
+}
+
+.danger-btn:disabled,
+.device-config-toolbar .query-btn:disabled,
+.device-config-toolbar .reset-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .cpu-high {

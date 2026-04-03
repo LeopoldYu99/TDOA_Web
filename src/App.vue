@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <div class="layout">
-    <!-- 左侧导航栏 -->
+    <!-- 左侧导航栏-->
     <aside class="sidebar">
       <div class="logo">
         <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -27,68 +27,71 @@
     <main class="main">
       <!-- 顶部工具栏已移除 -->
 
-      <!-- 地图区域（软件控制页不显示地图） -->
-      <!-- 内容查询页 -->
+      <!-- 地图区域锛堣蒋浠舵帶鍒堕〉涓嶆樉绀哄湴鍥撅級 -->
+      <!-- 内容查询页-->
       <section v-if="activeMenu === 1" class="file-query-page">
         <div class="file-query-bar">
           <input type="datetime-local" v-model="fileQueryStartTime" class="datetime-input" step="1" />
           <span class="datetime-arrow">→</span>
           <input type="datetime-local" v-model="fileQueryEndTime" class="datetime-input" step="1" />
-          <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyUl" /> 仅上行</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyUl" /> 包含上行</label>
           <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyImei" /> 仅IMEI</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyLocation" /> 仅拥有定位结果</label>
+          <input type="text" v-model="fileQueryImeiFilter" class="imei-filter-input" placeholder="IMEI过滤..." />
           <button class="query-btn" @click="handleFileQuery">查 询</button>
-          <button class="reset-btn" @click="handleFileQueryReset">重 置</button>
+          <button class="export-btn" @click="handleFileQueryExport">导出</button>
+        </div>
+        <div class="payload-filter-bar">
+          <span class="payload-filter-title">载荷过滤：</span>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterCommType" /> 业务类型</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterSignaling" /> 信令类型</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIdappXYZ" /> 播发经纬度</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterAircraft" /> ACARS</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterVoice" /> 语音通话</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterSms" /> 短信数据</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIp" /> IP数据</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterLowSpeed" /> 低速数据</label>
+          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIdapp" /> 解析数据</label>
         </div>
         <div v-if="loading" class="loading-overlay static-loading">
           <div class="loading-spinner"></div>
-          <span class="loading-text">数据加载中...</span>
+          <span class="loading-text">数据加载中..</span>
         </div>
         <div class="file-query-table-wrapper">
-          <table class="device-table">
+          <table class="device-table file-query-fixed-table">
+            <colgroup>
+              <col v-for="col in fileQueryColumns" :key="col.key" :style="{ width: col.width }" />
+              <col style="width:130px" />
+            </colgroup>
             <thead>
               <tr>
                 <th v-for="col in fileQueryColumns" :key="col.key" class="filterable-th">
                   <span>{{ col.label }}</span>
                   <button
+                    v-if="!col.noFilter"
                     class="filter-icon-btn"
-                    :class="{ 'filter-active': fileQueryFilters[col.key].size > 0 }"
-                    @click.stop="toggleFilterDropdown(col.key)"
+                    :class="{ 'filter-active': fileQueryFilters[col.key]?.size > 0 }"
+                    @click.stop="toggleFilterDropdown(col.key, $event)"
                   >
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
                       <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
                     </svg>
                   </button>
-                  <!-- 筛选下拉面板 -->
-                  <div v-if="activeFilterCol === col.key" class="filter-dropdown" @click.stop>
-                    <input type="text" class="filter-search" v-model="filterSearchText" placeholder="搜索..." />
-                    <div class="filter-actions">
-                      <button @click="filterSelectAll(col.key)">全选</button>
-                      <button @click="filterClearAll(col.key)">清除</button>
-                    </div>
-                    <div class="filter-options">
-                      <label
-                        v-for="val in getFilteredOptions(col.key)"
-                        :key="val"
-                        class="filter-option"
-                      >
-                        <input type="checkbox" :checked="fileQueryFilters[col.key].has(val)" @change="toggleFilterValue(col.key, val)" />
-                        <span>{{ val || '(空)' }}</span>
-                      </label>
-                      <div v-if="getFilteredOptions(col.key).length === 0" class="filter-empty">无匹配项</div>
-                    </div>
-                    <div class="filter-footer">
-                      <button class="filter-confirm" @click="activeFilterCol = null">确定</button>
-                    </div>
-                  </div>
                 </th>
                 <th>详情</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(row, i) in fileQueryPagedData" :key="i">
-                <td v-for="col in fileQueryColumns" :key="col.key" :class="{ 'payload-cell': col.key === 'payload' }">{{ row[col.key] }}</td>
-                <td><button class="detail-btn" @click="showLCWDetail(row)">详情</button></td>
+                <td v-for="col in fileQueryColumns" :key="col.key">
+                  <button v-if="col.key === 'payloadInfo'" class="payload-btn" @click="openPayloadModal(row)">查看载荷</button>
+                  <template v-else>{{ row[col.key] }}</template>
+                </td>
+                <td>
+                  <div class="detail-actions">
+                    <button class="detail-btn" @click="showLCWDetail(row)">查看</button>
+                    <button class="detail-export-btn" @click="handleLCWDetailExport(row)">导出</button>
+                  </div>
+                </td>
               </tr>
               <tr v-if="fileQueryFilteredData.length === 0">
                 <td :colspan="fileQueryColumns.length + 1" class="empty-row">暂无数据</td>
@@ -113,11 +116,20 @@
 
       <section v-show="activeMenu === 0 || activeMenu === 2" class="map-container">
         <div id="map" ref="mapRef"></div>
-        <!-- 实时位置 - 地图右上角控件 -->
+        <!-- 实时位置 - 地图右上角控件-->
         <div v-if="activeMenu === 0" class="map-controls">
           <select v-model="queryMode" class="map-select">
             <option value="realtime">实时模式</option>
             <option value="highprecision">高精度模式</option>
+          </select>
+          <select v-model="calStepSecond" class="map-select" :disabled="queryMode === 'realtime'" :title="queryMode === 'realtime' ? '实时定位模式无效' : 'CalStepSecond'">
+            <option value="30">30s</option>
+            <option value="60">1min</option>
+            <option value="120">2min</option>
+            <option value="300">5min</option>
+            <option value="600">10min</option>
+            <option value="1800">30min</option>
+            <option value="3600">60min</option>
           </select>
           <select v-model="timeRange" class="map-select">
             <option value="1hour">1hour</option>
@@ -133,13 +145,22 @@
         <!-- 加载遮罩 -->
         <div v-if="loading" class="loading-overlay">
           <div class="loading-spinner"></div>
-          <span class="loading-text">数据加载中...</span>
+          <span class="loading-text">数据加载中..</span>
         </div>
-        <!-- 位置展示 - 地图顶部查询栏 -->
+        <!-- 位置展示 - 鍦板浘椤堕儴查询鏍?-->
         <div v-if="activeMenu === 2" class="map-controls-bar">
           <select v-model="searchQueryMode" class="map-select">
             <option value="realtime">实时模式</option>
             <option value="highprecision">高精度模式</option>
+          </select>
+          <select v-model="searchCalStepSecond" class="map-select" :disabled="searchQueryMode === 'realtime'" :title="searchQueryMode === 'realtime' ? '实时定位模式无效' : 'CalStepSecond'">
+            <option value="30">30s</option>
+            <option value="60">1min</option>
+            <option value="120">2min</option>
+            <option value="300">5min</option>
+            <option value="600">10min</option>
+            <option value="1800">30min</option>
+            <option value="3600">60min</option>
           </select>
           <input type="datetime-local" v-model="searchStartTime" class="datetime-input" step="1" />
           <span class="datetime-arrow">→</span>
@@ -150,7 +171,7 @@
         </div>
       </section>
 
-      <!-- 软件控制 - 设备信息页 -->
+      <!-- 软件控制 - 设备信息页-->
       <section v-if="activeMenu === 3" class="device-page">
         <div class="device-table-wrapper">
           <table class="device-table">
@@ -173,7 +194,7 @@
                 <td>{{ dev.diskUsedGB }} / {{ dev.diskTotalGB }}</td>
                 <td>{{ dev.diskAvailGB }}</td>
                 <td :class="{ 'cpu-high': dev.cpuUsagePercent > 80 }">{{ dev.cpuUsagePercent }}</td>
-                <td><button class="mesh-btn" @click="openMeshPage(dev.ip)">前往自组网</button></td>
+                <td><button class="mesh-btn" @click="openMeshPage(i + 1)">前往自组网</button></td>
               </tr>
               <tr v-if="deviceList.length === 0">
                 <td colspan="7" class="empty-row">暂无数据</td>
@@ -183,34 +204,39 @@
         </div>
       </section>
 
-      <!-- 底部通信事件表格（仅实时位置页显示） -->
+      <!-- 底部通信事件表格锛堜粎实时位置椤垫樉绀猴級 -->
       <section v-if="activeMenu === 0" class="table-panel">
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
                 <th>设备号</th>
-                <th>数据数量</th>
+                <th>识别码</th>
                 <th>通信起始时间</th>
                 <th>通信截止时间</th>
                 <th>通信时长(秒)</th>
                 <th>IMEI</th>
-                <th>通联类型</th>
                 <th>定位经纬度</th>
+                <th>载荷信息</th>
                 <th>详情</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(row, i) in commTableData" :key="i">
                 <td>{{ row.deviceNumber }}</td>
-                <td>{{ row.dataCount }}</td>
+                <td>{{ row.chainID }}</td>
                 <td>{{ row.startTime }}</td>
                 <td>{{ row.endTime }}</td>
                 <td>{{ row.duration }}</td>
                 <td>{{ row.imei }}</td>
-                <td>{{ row.commType }}</td>
                 <td>{{ row.locationLatLon }}</td>
-                <td><button class="detail-btn" @click="showLCWDetail(row)">详情</button></td>
+                <td><button class="payload-btn" @click="openPayloadModal(row)">查看载荷</button></td>
+                <td>
+                  <div class="detail-actions">
+                    <button class="detail-btn" @click="showLCWDetail(row)">查看</button>
+                    <button class="detail-export-btn" @click="handleLCWDetailExport(row)">导出</button>
+                  </div>
+                </td>
               </tr>
               <tr v-if="commTableData.length === 0">
                 <td colspan="9" class="empty-row">暂无数据</td>
@@ -225,7 +251,7 @@
     <div v-if="showTrajectoryModal" class="trajectory-modal-overlay" @click.self="closeTrajectoryModal">
       <div class="trajectory-modal">
         <div class="trajectory-modal-header">
-          <span>终端轨迹 - {{ trajectoryTerminalId }}　　{{ trajectoryTimeRange }}</span>
+          <span>终端轨迹 - {{ trajectoryTerminalId }}  {{ trajectoryTimeRange }}</span>
           <button class="trajectory-modal-close" @click="closeTrajectoryModal">&times;</button>
         </div>
         <div class="trajectory-modal-body">
@@ -236,7 +262,7 @@
 
     <!-- LCW详情弹窗 -->
     <div v-if="showLCWModal" class="trajectory-modal-overlay" @click.self="showLCWModal = false">
-      <div class="trajectory-modal" style="width:70vw;height:60vh;">
+      <div class="trajectory-modal" style="width:90vw;height:80vh;">
         <div class="trajectory-modal-header">
           <span>LCW 详情</span>
           <button class="trajectory-modal-close" @click="showLCWModal = false">&times;</button>
@@ -244,41 +270,142 @@
         <div class="trajectory-modal-body" style="overflow:auto;">
           <div v-if="lcwLoading" class="loading-overlay" style="position:relative;height:100%;display:flex;align-items:center;justify-content:center;">
             <div class="loading-spinner"></div>
-            <span class="loading-text">加载中...</span>
+            <span class="loading-text">加载中..</span>
           </div>
-          <table v-else class="device-table" style="width:100%;">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>类型</th>
-                <th>方向</th>
-                <th>频率</th>
-                <th>IMEI</th>
-                <th>TMSI</th>
-                <th>信道</th>
-                <th>载荷</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in lcwDetailData" :key="i">
-                <td>{{ row.time }}</td>
-                <td>{{ row.type }}</td>
-                <td>{{ row.isUl }}</td>
-                <td>{{ row.frequency }}</td>
-                <td>{{ row.imei }}</td>
-                <td>{{ row.tmsi }}</td>
-                <td>{{ row.chn }}</td>
-                <td>{{ row.payload }}</td>
-              </tr>
-              <tr v-if="lcwDetailData.length === 0 && !lcwLoading">
-                <td colspan="8" class="empty-row">暂无数据</td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-else class="lcw-detail-wrapper">
+            <table class="device-table lcw-detail-table" style="width:100%;">
+              <thead>
+                <tr>
+                  <th v-for="col in lcwDetailColumns" :key="col.key" class="filterable-th">
+                    <span>{{ col.label }}</span>
+                    <button
+                      class="filter-icon-btn"
+                      :class="{ 'filter-active': lcwDetailFilters[col.key]?.size > 0 }"
+                      @click.stop="toggleLCWFilterDropdown(col.key, $event)"
+                    >
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                      </svg>
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, i) in lcwDetailFilteredData" :key="i">
+                  <td
+                    v-for="col in lcwDetailColumns"
+                    :key="col.key"
+                    :style="col.key === 'rawLine' ? 'text-align:left;word-break:break-all;' : ''"
+                  >
+                    {{ row[col.key] }}
+                  </td>
+                </tr>
+                <tr v-if="lcwDetailFilteredData.length === 0 && !lcwLoading">
+                  <td :colspan="lcwDetailColumns.length" class="empty-row">暂无数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 载荷信息弹窗 -->
+    <div v-if="showPayloadModal" class="trajectory-modal-overlay" @click.self="showPayloadModal = false">
+      <div class="payload-modal">
+        <div class="trajectory-modal-header">
+          <span>载荷信息</span>
+          <button class="trajectory-modal-close" @click="showPayloadModal = false">&times;</button>
+        </div>
+        <div class="payload-modal-body">
+          <div v-for="section in currentPayloadSections" :key="section.label" class="payload-section">
+            <div class="payload-section-label" :style="{ color: section.color }">{{ section.label }}</div>
+            <div class="payload-tags">
+              <!-- 璇煶閫氳瘽锛氭瘡鏉℃樉绀轰笅杞芥寜閽?-->
+              <template v-if="section.type === 'wav'">
+                <button
+                  v-for="(val, vi) in section.values"
+                  :key="vi"
+                  class="wav-download-btn"
+                  @click="downloadWav(val, currentPayloadData.chainID, vi)"
+                >
+                  <span class="wav-icon">&#9654;</span> 语音{{ vi + 1 }}.wav
+                </button>
+              </template>
+              <!-- 鏂囨湰类型锛氬琛屽睍绀?-->
+              <template v-else-if="section.type === 'text'">
+                <div class="payload-text-block">
+                  <span v-for="(line, li) in section.text.split('\n')" :key="li" class="payload-text-line">{{ line }}</span>
+                </div>
+              </template>
+              <!-- 鏍囩类型 -->
+              <template v-else>
+                <span v-for="(val, vi) in section.values" :key="vi" class="payload-tag" :style="{ borderColor: section.color, color: section.color }">{{ val }}</span>
+              </template>
+            </div>
+          </div>
+          <div v-if="currentPayloadSections.length === 0" class="empty-row" style="padding:24px 0;">暂无载荷数据</div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 列筛选変笅鎷夛紙Teleport 鍒?body锛宖ixed 瀹氫綅锛屼笉琚?overflow 瑁佸壀锛?-->
+  <Teleport to="body">
+    <div
+      v-if="activeFilterCol"
+      class="filter-dropdown"
+      :style="{ top: filterDropdownPos.top + 'px', left: filterDropdownPos.left + 'px' }"
+      @click.stop
+    >
+      <input type="text" class="filter-search" v-model="filterSearchText" placeholder="搜索..." />
+      <div class="filter-actions">
+        <button @click="filterSelectAll(activeFilterCol)">全选</button>
+        <button @click="filterClearAll(activeFilterCol)">清除</button>
+      </div>
+      <div class="filter-options">
+        <label
+          v-for="val in getFilteredOptions(activeFilterCol)"
+          :key="val"
+          class="filter-option"
+        >
+          <input type="checkbox" :checked="fileQueryFilters[activeFilterCol]?.has(val)" @change="toggleFilterValue(activeFilterCol, val)" />
+          <span>{{ val || '(空)' }}</span>
+        </label>
+        <div v-if="getFilteredOptions(activeFilterCol).length === 0" class="filter-empty">无匹配项</div>
+      </div>
+      <div class="filter-footer">
+        <button class="filter-confirm" @click="activeFilterCol = null">确定</button>
+      </div>
+    </div>
+  </Teleport>
+  <Teleport to="body">
+    <div
+      v-if="lcwActiveFilterCol"
+      class="filter-dropdown"
+      :style="{ top: lcwFilterDropdownPos.top + 'px', left: lcwFilterDropdownPos.left + 'px' }"
+      @click.stop
+    >
+      <input type="text" class="filter-search" v-model="lcwFilterSearchText" placeholder="搜索..." />
+      <div class="filter-actions">
+        <button @click="lcwFilterSelectAll(lcwActiveFilterCol)">全选</button>
+        <button @click="lcwFilterClearAll(lcwActiveFilterCol)">清除</button>
+      </div>
+      <div class="filter-options">
+        <label
+          v-for="val in getLCWFilteredOptions(lcwActiveFilterCol)"
+          :key="val"
+          class="filter-option"
+        >
+          <input type="checkbox" :checked="lcwDetailFilters[lcwActiveFilterCol]?.has(val)" @change="toggleLCWFilterValue(lcwActiveFilterCol, val)" />
+          <span>{{ val || '(空)' }}</span>
+        </label>
+        <div v-if="getLCWFilteredOptions(lcwActiveFilterCol).length === 0" class="filter-empty">无匹配项</div>
+      </div>
+      <div class="filter-footer">
+        <button class="filter-confirm" @click="lcwActiveFilterCol = null">确定</button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -294,16 +421,18 @@ const menuItems = [
   { label: '实时位置', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>' },
   { label: '内容查询', icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/>' },
   { label: '位置展示', icon: '<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.4 8 12 8 12s8-6.6 8-12a8 8 0 00-8-8z"/>' },
-  { label: '软件控制', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' },
+  { label: '设备信息', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' },
 ]
 
-// 地图控件状态 - 实时位置
+// 鍦板浘鎺т欢鐘舵€?- 实时位置
 const queryMode = ref('realtime')
+const calStepSecond = ref('60')
 const timeRange = ref('2hour')
 const refreshInterval = ref('10min')
 
 // 位置展示查询参数
 const searchQueryMode = ref('realtime')
+const searchCalStepSecond = ref('60')
 const searchStartTime = ref('')
 const searchEndTime = ref('')
 const searchTerminalId = ref('')
@@ -312,6 +441,33 @@ const searchTerminalId = ref('')
 const showLCWModal = ref(false)
 const lcwDetailData = ref([])
 const lcwLoading = ref(false)
+const lcwDetailColumns = [
+  { key: 'deviceNumber', label: '设备编号' },
+  { key: 'time', label: '时间' },
+  { key: 'isUl', label: '方向' },
+  { key: 'frequency', label: '频率' },
+  { key: 'imei', label: 'IMEI' },
+  { key: 'chn', label: '信道' },
+  { key: 'signaling', label: '信号类型' },
+  { key: 'frameType', label: '帧类型' },
+  { key: 'rawLine', label: '原始数据' },
+]
+const lcwDetailFilters = reactive(
+  Object.fromEntries(lcwDetailColumns.map(c => [c.key, new Set()]))
+)
+const lcwActiveFilterCol = ref(null)
+const lcwFilterSearchText = ref('')
+const lcwFilterDropdownPos = ref({ top: 0, left: 0 })
+
+const lcwDetailFilteredData = computed(() => {
+  return lcwDetailData.value.filter(row => {
+    return lcwDetailColumns.every(col => {
+      const selected = lcwDetailFilters[col.key]
+      if (!selected || selected.size === 0) return true
+      return selected.has(String(row[col.key] || ''))
+    })
+  })
+})
 
 // 轨迹弹窗
 const showTrajectoryModal = ref(false)
@@ -325,27 +481,40 @@ const fileQueryEndTime = ref('')
 const fileQueryOnlyUl = ref(true)
 const fileQueryOnlyImei = ref(true)
 const fileQueryOnlyLocation = ref(true)
+const fileQueryImeiFilter = ref('')
+
+// 载荷杩囨护
+const payloadFilterCommType = ref(false)
+const payloadFilterSignaling = ref(false)
+const payloadFilterIdappXYZ = ref(false)
+const payloadFilterAircraft = ref(false)
+const payloadFilterVoice = ref(false)
+const payloadFilterSms = ref(false)
+const payloadFilterIp = ref(false)
+const payloadFilterLowSpeed = ref(false)
+const payloadFilterIdapp = ref(false)
 const fileQueryTableData = ref([])
 const fileQueryPage = ref(1)
 const fileQueryPageSize = 50
 
 const fileQueryColumns = [
-  { key: 'deviceNumber', label: '设备编号' },
-  { key: 'dataCount', label: '数据数量' },
-  { key: 'startTime', label: '通信起始时间' },
-  { key: 'endTime', label: '通信截止时间' },
-  { key: 'duration', label: '通信时间(秒)' },
-  { key: 'imei', label: 'IMEI' },
-  { key: 'commType', label: '通联类型' },
-  { key: 'locationLatLon', label: '定位经纬度' }
+  { key: 'deviceNumber', label: '设备编号', width: '65px' },
+  { key: 'chainID', label: '识别码', width: '160px' },
+  { key: 'startTime', label: '通信起始时间', width: '140px' },
+  { key: 'endTime', label: '通信截止时间', width: '140px' },
+  { key: 'duration', label: '通信时长(秒)', width: '85px' },
+  { key: 'imei', label: 'IMEI', width: '120px' },
+  { key: 'locationLatLon', label: '定位经纬度', width: '160px' },
+  { key: 'payloadInfo', label: '载荷信息', width: '80px', noFilter: true },
 ]
 
-// 筛选状态：每列一个 Set，空 Set 表示不筛选
+// 列筛选状态：每列一个 Set，空 Set 表示不过滤
 const fileQueryFilters = reactive(
   Object.fromEntries(fileQueryColumns.map(c => [c.key, new Set()]))
 )
 const activeFilterCol = ref(null)
 const filterSearchText = ref('')
+const filterDropdownPos = ref({ top: 0, left: 0 })
 
 // 获取某列所有唯一值
 function getColumnUniqueValues(key) {
@@ -354,7 +523,7 @@ function getColumnUniqueValues(key) {
   return [...vals].sort()
 }
 
-// 获取筛选搜索后的选项
+// 鑾峰彇绛涢€夋悳绱㈠悗鐨勯€夐」
 function getFilteredOptions(key) {
   const all = getColumnUniqueValues(key)
   if (!filterSearchText.value) return all
@@ -362,12 +531,20 @@ function getFilteredOptions(key) {
   return all.filter(v => v.toLowerCase().includes(kw))
 }
 
-function toggleFilterDropdown(key) {
+function toggleFilterDropdown(key, event) {
   if (activeFilterCol.value === key) {
     activeFilterCol.value = null
   } else {
     activeFilterCol.value = key
     filterSearchText.value = ''
+    // 鐢ㄦ寜閽潗鏍囧畾浣嶏紝閬垮厤琚?overflow:auto 瑁佸壀
+    if (event?.currentTarget) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      filterDropdownPos.value = {
+        top: rect.bottom + 4,
+        left: rect.left,
+      }
+    }
   }
 }
 
@@ -390,18 +567,80 @@ function filterClearAll(key) {
   fileQueryPage.value = 1
 }
 
-// 点击其他地方关闭筛选面板
-function closeFilterDropdown() {
-  activeFilterCol.value = null
+function getLCWColumnUniqueValues(key) {
+  const vals = new Set()
+  lcwDetailData.value.forEach(row => vals.add(String(row[key] || '')))
+  return [...vals].sort()
+}
+
+function getLCWFilteredOptions(key) {
+  const all = getLCWColumnUniqueValues(key)
+  if (!lcwFilterSearchText.value) return all
+  const kw = lcwFilterSearchText.value.toLowerCase()
+  return all.filter(v => v.toLowerCase().includes(kw))
+}
+
+function toggleLCWFilterDropdown(key, event) {
+  if (lcwActiveFilterCol.value === key) {
+    lcwActiveFilterCol.value = null
+  } else {
+    lcwActiveFilterCol.value = key
+    lcwFilterSearchText.value = ''
+    if (event?.currentTarget) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      lcwFilterDropdownPos.value = {
+        top: rect.bottom + 4,
+        left: rect.left,
+      }
+    }
+  }
+}
+
+function toggleLCWFilterValue(key, val) {
+  const s = lcwDetailFilters[key]
+  if (s.has(val)) s.delete(val)
+  else s.add(val)
+}
+
+function lcwFilterSelectAll(key) {
+  const all = getLCWFilteredOptions(key)
+  const s = lcwDetailFilters[key]
+  all.forEach(v => s.add(v))
+}
+
+function lcwFilterClearAll(key) {
+  lcwDetailFilters[key].clear()
 }
 
 const fileQueryFilteredData = computed(() => {
   return fileQueryTableData.value.filter(row => {
-    return fileQueryColumns.every(col => {
+    // IMEI 文本过滤（前端，模糊匹配）
+    if (fileQueryImeiFilter.value.trim()) {
+      const kw = fileQueryImeiFilter.value.trim().toLowerCase()
+      if (!String(row.imei || '').toLowerCase().includes(kw)) return false
+    }
+
+    // 列筛选夛紙noFilter 鍒楄烦杩囷級
+    if (!fileQueryColumns.every(col => {
+      if (col.noFilter) return true
       const selected = fileQueryFilters[col.key]
-      if (selected.size === 0) return true
+      if (!selected || selected.size === 0) return true
       return selected.has(String(row[col.key] || ''))
-    })
+    })) return false
+
+    // 载荷过滤（勾选的条件必须全部满足）
+    const d = row.payloadData || {}
+    if (payloadFilterCommType.value && !(d.commType?.length > 0)) return false
+    if (payloadFilterSignaling.value && !(d.signaling?.length > 0)) return false
+    if (payloadFilterIdappXYZ.value && !(d.idappXYZ?.length > 0)) return false
+    if (payloadFilterAircraft.value && !(d.acars?.length > 0)) return false
+    if (payloadFilterVoice.value && !(d.voiceWavs?.length > 0)) return false
+    if (payloadFilterSms.value && !(d.sms?.length > 0)) return false
+    if (payloadFilterIp.value && !(d.ipData?.length > 0)) return false
+    if (payloadFilterLowSpeed.value && !d.isLowSpeedData) return false
+    if (payloadFilterIdapp.value && !d.parsedData) return false
+
+    return true
   })
 })
 
@@ -432,7 +671,7 @@ const fileQueryVisiblePages = computed(() => {
 const tableData = ref([])
 const commTableData = ref([])
 
-// 软件控制 - 设备列表（固定三台）
+// 软件控制 - 设备列表锛堝浐瀹氫笁鍙帮級
 const deviceList = ref([
   { name: 'Device1', isOnline: false, ip: '', lastWorkedTime: '', workedTime: '', diskUsedGB: '0.00', diskTotalGB: '0.00', diskAvailGB: '0.00', cpuUsagePercent: 0 },
   { name: 'Device2', isOnline: false, ip: '', lastWorkedTime: '', workedTime: '', diskUsedGB: '0.00', diskTotalGB: '0.00', diskAvailGB: '0.00', cpuUsagePercent: 0 },
@@ -470,7 +709,7 @@ const timeRangeHours = {
   '1hour': 1, '2hour': 2, '6hour': 6, '12hour': 12, '24hour': 24
 }
 
-// 刷新间隔映射（毫秒）
+// 刷新间隔映射锛堟绉掞級
 const refreshIntervalMs = {
   '5min': 5 * 60 * 1000,
   '10min': 10 * 60 * 1000,
@@ -478,25 +717,23 @@ const refreshIntervalMs = {
   '60min': 60 * 60 * 1000
 }
 
-// 格式化日期为 API 需要的格式
+// 格式化栨棩鏈熶负 API 闇€瑕佺殑鏍煎紡
 function formatDateTime(date) {
   const pad = n => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-// 格式化日期用于表格显示
-// 格式化 .NET TimeSpan 字符串
-// "739699.14:51:03.8393552" → "739699天 14:51:03"
-// "00:00:12.1426503"        → "00:00:12"
+// 格式化日期用于表格显示// 格式化.NET TimeSpan 字符串// "739699.14:51:03.8393552" 鈫?"739699澶?14:51:03"
+// "00:00:12.1426503"        鈫?"00:00:12"
 function formatWorkedTime(val) {
   if (!val) return ''
-  // 判断是否有天数前缀：形如 "数字.数字:数字:数字"
+  // 判断是否有天数前缀€锛氬舰濡?"数字.数字:数字:数字"
   const withDays = /^(\d+)\.(\d+):(\d+):(\d+)/.exec(val)
   if (withDays) {
     const [, d, hh, mm, ss] = withDays
     return `${d}天 ${hh.padStart(2,'0')}:${mm.padStart(2,'0')}:${ss.padStart(2,'0')}`
   }
-  // 不含天数：形如 "HH:mm:ss.fff"
+  // 不含天数锛氬舰濡?"HH:mm:ss.fff"
   const nodays = /^(\d+):(\d+):(\d+)/.exec(val)
   if (nodays) {
     const [, hh, mm, ss] = nodays
@@ -518,7 +755,29 @@ function formatDisplay(dateStr) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-// 计算通信时长
+function formatDisplayPlus8(dateStr) {
+  if (!dateStr) return ''
+  // 强制按 UTC 解析（服务端返回无时区字符串）
+  const utcStr = String(dateStr).replace(' ', 'T') + 'Z'
+  const d = new Date(new Date(utcStr).getTime() + 8 * 3600 * 1000)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+}
+
+// 璁＄畻閫氫俊鏃堕暱
+function getChainIdFromItem(item) {
+  return String(item?.chainID ?? item?.ChainID ?? item?.chainId ?? item?.ChainId ?? '').trim()
+}
+
+function formatLocationLatLon(item) {
+  const lat = item?.['定位经纬度Lat'] ?? item?.定位经纬度Lat ?? item?.locationLat ?? item?.LocationLat ?? item?.lat ?? item?.Lat
+  const lon = item?.['定位经纬度Lon'] ?? item?.定位经纬度Lon ?? item?.locationLon ?? item?.LocationLon ?? item?.lon ?? item?.Lon
+  if (lat !== undefined && lat !== null && lon !== undefined && lon !== null && String(lat).trim() !== '' && String(lon).trim() !== '') {
+    return `${lat}, ${lon}`
+  }
+  return String(item?.locationLatLon ?? item?.LocationLatLon ?? '').trim()
+}
+
 function calcDuration(start, end) {
   if (!start || !end) return ''
   const ms = new Date(end) - new Date(start)
@@ -532,14 +791,14 @@ function calcDuration(start, end) {
   return `${s}s`
 }
 
-// 解析 .NET TimeSpan 字符串为秒数（保留2位小数）
+// 解析 .NET TimeSpan 字符串为秒数锛堜繚鐣?浣嶅皬鏁帮級
 function parseDurationToSeconds(dur) {
   if (dur === null || dur === undefined || dur === '') return ''
   // If already a number, just format it
   if (typeof dur === 'number') return dur.toFixed(2)
   // If string that looks like a number (no colons)
   if (typeof dur === 'string' && !dur.includes(':')) return parseFloat(dur).toFixed(2)
-  // 格式: "HH:MM:SS.xxx" 或 "D.HH:MM:SS.xxx"
+  // 格式: "HH:MM:SS.xxx" 鎴?"D.HH:MM:SS.xxx"
   const parts = dur.split(':')
   if (parts.length < 3) return dur
   let h = 0, m = 0, s = 0
@@ -570,11 +829,13 @@ async function fetchCoordinateData() {
     EndTime: formatDateTime(now),
     LocateByCoummounication: isRealtime ? 'true' : 'false',
     LocateByImeiOrTmsi: 'false',
-    TargetImeiOrTmsi: ''
+    TargetImeiOrTmsi: '',
+    isshowdevice: 'true',
+    ...(isRealtime ? {} : { CalStepSecond: calStepSecond.value })
   })
 
   try {
-    const resp = await fetch(`/api/Result/NewSearchCoordinate?${params}`)
+    const resp = await fetch(`/api/Result/SearchCoordinate?${params}`)
     const text = await resp.text()
     if (!text) return
     const result = JSON.parse(text)
@@ -583,8 +844,9 @@ async function fetchCoordinateData() {
       // 更新表格数据
       tableData.value = result.data.map(item => ({
         terminalId: item.terminalID || '',
-        startTime: formatDisplay(item.startTime),
-        endTime: formatDisplay(item.endTime),
+        chainID: getChainIdFromItem(item),
+        startTime: formatDisplayPlus8(item.startTime),
+        endTime: formatDisplayPlus8(item.endTime),
         duration: calcDuration(item.startTime, item.endTime),
         longitude: item.longitude,
         latitude: item.latitude,
@@ -601,7 +863,7 @@ async function fetchCoordinateData() {
 }
 
 // 更新地图上的标记
-// 判断是否为设备标记（device1/2/3，只有坐标没有时间）
+// 判断是否为设备标记帮紙device1/2/3锛屽彧鏈夊潗鏍囨病鏈夋椂闂达級
 function isDeviceMarker(item) {
   const id = (item.terminalID || '').toLowerCase()
   return id.startsWith('devive') || id.startsWith('device')
@@ -622,68 +884,154 @@ function createPinIcon(color) {
   })
 }
 
+// 閲嶅彔鐐硅仛鍚堢姸鎬侊細key -> { lat, lng, items, clusterMarker, expanded, individualMarkers }
+let clusterGroups = {}
+
+function createClusterIcon(count) {
+  const r = count > 99 ? 20 : count > 9 ? 18 : 16
+  const d = r * 2
+  const h = d + r * 0.7
+  const fs = count > 99 ? 11 : 13
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${d}" height="${h}" viewBox="0 0 ${d} ${h}">
+    <circle cx="${r}" cy="${r}" r="${r - 1.5}" fill="#1890ff" stroke="#fff" stroke-width="2.5"/>
+    <polygon points="${r - 6},${d - 3} ${r + 6},${d - 3} ${r},${h}" fill="#1890ff"/>
+    <text x="${r}" y="${r + fs * 0.38}" text-anchor="middle" fill="#fff"
+      font-size="${fs}" font-weight="700" font-family="sans-serif">${count}</text>
+  </svg>`
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [d, h],
+    iconAnchor: [r, h], // 尖角底部为锚点
+  })
+}
+
+// 鍒涘缓鍗曚釜缁堢鏍囪骞舵坊鍔犲埌鍦板浘
+function createSingleMarker(item, lat, lng) {
+  let marker
+  const chainID = getChainIdFromItem(item)
+  if (isDeviceMarker(item)) {
+    marker = L.marker([lat, lng], { icon: createPinIcon('#52c41a') }).addTo(map)
+    marker.bindPopup(
+      `<b>${item.terminalID}</b>${chainID ? `<br>识别码: ${chainID}` : ''}<br>经度: ${item.longitude.toFixed(6)}<br>纬度: ${item.latitude.toFixed(6)}`
+    )
+  } else {
+    const hasTerminal = !!item.terminalID
+    marker = L.circleMarker([lat, lng], {
+      radius: 7,
+      fillColor: hasTerminal ? '#1890ff' : '#e74c3c',
+      color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.85
+    }).addTo(map)
+    const popupContent = document.createElement('div')
+    popupContent.style.cssText = 'font-size:13px;line-height:1.8;min-width:180px;'
+    popupContent.innerHTML =
+      `<div style="font-weight:600;font-size:14px;color:#1e3a5f;border-bottom:1px solid #e8e8e8;padding-bottom:4px;margin-bottom:4px;">终端: ${item.terminalID || '无'}</div>` +
+      (chainID ? `<div>识别码: ${chainID}</div>` : '') +
+      `<div>经度: ${item.longitude.toFixed(6)}</div>` +
+      `<div>纬度: ${item.latitude.toFixed(6)}</div>` +
+      `<div>时间: ${formatDisplay(item.lastDataTime)}</div>`
+    if (hasTerminal) {
+      const btn = document.createElement('button')
+      btn.textContent = '查询轨迹'
+      btn.style.cssText = 'margin-top:8px;padding:4px 14px;background:#1890ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;width:100%;'
+      btn.onmouseenter = () => btn.style.background = '#096dd9'
+      btn.onmouseleave = () => btn.style.background = '#1890ff'
+      btn.onclick = () => queryTrajectory(item.terminalID)
+      popupContent.appendChild(btn)
+    }
+    marker.bindPopup(popupContent)
+  }
+  return marker
+}
+
+// 展开聚合：移除聚合图标，在圆形范围内显示各终端标记
+function expandCluster(key) {
+  const g = clusterGroups[key]
+  if (!g || g.expanded) return
+  map.removeLayer(g.clusterMarker)
+  g.expanded = true
+  g.individualMarkers = []
+  const n = g.items.length
+  const R = 0.0004
+
+  // 半透明背景圆，视觉上框住散开的标记
+  const bgCircle = L.circle([g.lat, g.lng], {
+    radius: 55,          // 绫筹紝涓庢暎寮€鍗婂緞鍖归厤
+    color: '#ff4d4f',
+    weight: 1.5,
+    opacity: 0.5,
+    fillColor: '#ff4d4f',
+    fillOpacity: 0.08,
+    interactive: false,
+  }).addTo(map)
+  g.individualMarkers.push(bgCircle)
+
+  g.items.forEach((item, idx) => {
+    const angle = (2 * Math.PI * idx) / n - Math.PI / 2
+    const lat = g.lat + R * Math.cos(angle)
+    const lng = g.lng + R * Math.sin(angle)
+    const m = createSingleMarker(item, lat, lng)
+    g.individualMarkers.push(m)
+  })
+  // 鏀惰捣鎸夐挳
+  const collapseIcon = L.divIcon({
+    html: `<div class="map-cluster-collapse">×</div>`,
+    className: '',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  })
+  const collapseMarker = L.marker([g.lat, g.lng], { icon: collapseIcon, zIndexOffset: 1000 }).addTo(map)
+  collapseMarker.on('click', () => collapseCluster(key))
+  g.collapseMarker = collapseMarker
+  g.individualMarkers.push(collapseMarker)
+}
+
+// 收起聚合：移除各终端标记，恢复聚合图标
+function collapseCluster(key) {
+  const g = clusterGroups[key]
+  if (!g || !g.expanded) return
+  g.individualMarkers.forEach(m => map.removeLayer(m))
+  g.individualMarkers = []
+  g.collapseMarker = null
+  g.expanded = false
+  g.clusterMarker.addTo(map)
+}
+
 function updateMapMarkers(data) {
-  // 清除旧标记
+  // 清除鏃ф爣璁帮紙鍚凡灞曞紑鐨勪釜浣撴爣璁帮級
   markers.forEach(m => map.removeLayer(m))
+  Object.values(clusterGroups).forEach(g => {
+    g.individualMarkers.forEach(m => map.removeLayer(m))
+  })
   markers = []
+  clusterGroups = {}
 
   if (!data || data.length === 0) return
 
+  // 按精确坐标分组
+  const coordGroups = {}
   data.forEach(item => {
-    if (item.latitude && item.longitude && item.latitude !== 0 && item.longitude !== 0) {
-      let marker
+    if (!item.latitude || !item.longitude || item.latitude === 0 || item.longitude === 0) return
+    const key = `${item.latitude.toFixed(6)},${item.longitude.toFixed(6)}`
+    if (!coordGroups[key]) coordGroups[key] = []
+    coordGroups[key].push(item)
+  })
 
-      if (isDeviceMarker(item)) {
-        // 设备标记 - 用图钉图标，绿色
-        marker = L.marker([item.latitude, item.longitude], {
-          icon: createPinIcon('#52c41a')
-        }).addTo(map)
-
-        marker.bindPopup(
-          `<b>${item.terminalID}</b><br>` +
-          `经度: ${item.longitude.toFixed(6)}<br>` +
-          `纬度: ${item.latitude.toFixed(6)}`
-        )
-      } else {
-        // 普通标记 - 圆点
-        const hasTerminal = !!item.terminalID
-        marker = L.circleMarker([item.latitude, item.longitude], {
-          radius: 7,
-          fillColor: hasTerminal ? '#1890ff' : '#e74c3c',
-          color: '#fff',
-          weight: 2,
-          opacity: 1,
-          fillOpacity: 0.85
-        }).addTo(map)
-
-        const popupContent = document.createElement('div')
-        popupContent.style.cssText = 'font-size:13px;line-height:1.8;min-width:180px;'
-        popupContent.innerHTML =
-          `<div style="font-weight:600;font-size:14px;color:#1e3a5f;border-bottom:1px solid #e8e8e8;padding-bottom:4px;margin-bottom:4px;">终端: ${item.terminalID || '无'}</div>` +
-          `<div>经度: ${item.longitude.toFixed(6)}</div>` +
-          `<div>纬度: ${item.latitude.toFixed(6)}</div>` +
-          `<div>时间: ${formatDisplay(item.lastDataTime)}</div>`
-        if (hasTerminal) {
-          const btn = document.createElement('button')
-          btn.textContent = '查询轨迹'
-          btn.style.cssText = 'margin-top:8px;padding:4px 14px;background:#1890ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;width:100%;'
-          btn.onmouseenter = () => btn.style.background = '#096dd9'
-          btn.onmouseleave = () => btn.style.background = '#1890ff'
-          btn.onclick = () => queryTrajectory(item.terminalID)
-          popupContent.appendChild(btn)
-        }
-        marker.bindPopup(popupContent)
-      }
-
-      markers.push(marker)
+  Object.entries(coordGroups).forEach(([key, group]) => {
+    const [lat, lng] = key.split(',').map(Number)
+    if (group.length === 1) {
+      // 单点，直接渲染
+      markers.push(createSingleMarker(group[0], lat, lng))
+    } else {
+      // 多点重叠，显示聚合图标
+      const clusterMarker = L.marker([lat, lng], { icon: createClusterIcon(group.length), zIndexOffset: 500 }).addTo(map)
+      clusterMarker.on('click', () => expandCluster(key))
+      markers.push(clusterMarker)
+      clusterGroups[key] = { lat, lng, items: group, clusterMarker, expanded: false, individualMarkers: [], collapseMarker: null }
     }
   })
 
-  // 如果有数据，调整视野
-  if (markers.length > 0) {
-    const group = L.featureGroup(markers)
-    map.fitBounds(group.getBounds().pad(0.2))
-  }
+  // 涓嶈嚜鍔ㄧ缉鏀惧湴鍥撅紝淇濈暀鐢ㄦ埛褰撳墠瑙嗚
 }
 
 // 查询LCW详情
@@ -691,8 +1039,26 @@ async function showLCWDetail(row) {
   showLCWModal.value = true
   lcwDetailData.value = []
   lcwLoading.value = true
+  lcwDetailColumns.forEach(c => lcwDetailFilters[c.key].clear())
+  lcwActiveFilterCol.value = null
+  lcwFilterSearchText.value = ''
+  try {
+    lcwDetailData.value = await fetchLCWDetailRows(row)
+  } catch (err) {
+    console.error('查询LCW详情失败:', err)
+  } finally {
+    lcwLoading.value = false
+  }
+  return
 
-  // 使用查询时的时间范围，而非行数据的时间
+  showLCWModal.value = true
+  lcwDetailData.value = []
+  lcwLoading.value = true
+  lcwDetailColumns.forEach(c => lcwDetailFilters[c.key].clear())
+  lcwActiveFilterCol.value = null
+  lcwFilterSearchText.value = ''
+
+  // 使用查询时的时间范围锛岃€岄潪琛屾暟鎹殑时间
   let startTime, endTime
   if (activeMenu.value === 0) {
     // 实时位置 - 当前时间减去时间范围
@@ -719,14 +1085,15 @@ async function showLCWDetail(row) {
     if (!text) return
     const result = JSON.parse(text)
     lcwDetailData.value = (result.data || []).map(item => ({
-      time: formatDisplay(item.time),
-      type: item.type,
-      isUl: item.isUl ? '上行' : '下行',
-      frequency: item.frequncy,
-      imei: item.imei || '',
-      tmsi: item.tmsi || '',
-      chn: item.chn,
-      payload: item.payload || ''
+      deviceNumber: item.deviceName ?? item.DeviceName ?? item.deviceNumber ?? item.DeviceNumber ?? '',
+      time: formatDisplayPlus8(item.time ?? item.Time),
+      isUl: (item.isUl ?? item.IsUl ?? item.isUL ?? item.IsUL) ? '上行' : '下行',
+      frequency: item.frequncy ?? item.frequency ?? item.Frequency ?? item.Frequncy ?? '',
+      imei: item.imei ?? item.Imei ?? item.IMEI ?? '',
+      chn: item.chn ?? item.Chn ?? item.channel ?? item.Channel ?? '',
+      signaling: item['信令类型'] ?? item.signaling ?? item.Signaling ?? '',
+      frameType: item.frameType ?? item.FrameType ?? '',
+      rawLine: item.rawLine ?? item.RawLine ?? ''
     }))
   } catch (err) {
     console.error('查询LCW详情失败:', err)
@@ -736,6 +1103,75 @@ async function showLCWDetail(row) {
 }
 
 // 查询轨迹
+function getLCWQueryTimeRangeForDetail() {
+  if (activeMenu.value === 0) {
+    const now = new Date()
+    const hours = timeRangeHours[timeRange.value] || 2
+    const start = new Date(now.getTime() - hours * 3600 * 1000)
+    return {
+      startTime: formatDateTime(start),
+      endTime: formatDateTime(now)
+    }
+  }
+  return {
+    startTime: fileQueryStartTime.value,
+    endTime: fileQueryEndTime.value
+  }
+}
+
+function mapLCWDetailRowsForUI(list) {
+  return (list || []).map(item => ({
+    deviceNumber: item.deviceName ?? item.DeviceName ?? item.deviceNumber ?? item.DeviceNumber ?? '',
+    time: formatDisplayPlus8(item.time ?? item.Time),
+    isUl: (item.isUl ?? item.IsUl ?? item.isUL ?? item.IsUL) ? '上行' : '下行',
+    frequency: item.frequncy ?? item.frequency ?? item.Frequency ?? item.Frequncy ?? '',
+    imei: item.imei ?? item.Imei ?? item.IMEI ?? '',
+    chn: item.chn ?? item.Chn ?? item.channel ?? item.Channel ?? '',
+    signaling: item['信令类型'] ?? item.signaling ?? item.Signaling ?? '',
+    frameType: item.frameType ?? item.FrameType ?? '',
+    rawLine: item.rawLine ?? item.RawLine ?? ''
+  }))
+}
+
+async function fetchLCWDetailRows(row) {
+  const { startTime, endTime } = getLCWQueryTimeRangeForDetail()
+  const params = new URLSearchParams({
+    StartTime: startTime,
+    EndTime: endTime,
+    ChainID: row.chainID || ''
+  })
+
+  const resp = await fetch(`/api/Result/SearchLCW?${params}`)
+  const text = await resp.text()
+  if (!text) return []
+  const result = JSON.parse(text)
+  return mapLCWDetailRowsForUI(result.data || [])
+}
+
+async function handleLCWDetailExport(row) {
+  try {
+    const rows = await fetchLCWDetailRows(row)
+    const cols = lcwDetailColumns
+    const header = cols.map(c => csvEscape(c.label)).join(',')
+    const lines = rows.map(r => cols.map(c => csvEscape(r?.[c.key] ?? '')).join(','))
+    const csv = [header, ...lines].join('\r\n')
+
+    const now = new Date()
+    const pad = n => String(n).padStart(2, '0')
+    const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+    const chain = String(row?.chainID || 'unknown').replace(/[\\/:*?"<>|]/g, '_')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `lcw_detail_${chain}_${ts}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('导出LCW详情澶辫触:', err)
+  }
+}
+
 async function queryTrajectory(terminalId) {
   trajectoryTerminalId.value = terminalId
   showTrajectoryModal.value = true
@@ -750,19 +1186,27 @@ async function queryTrajectory(terminalId) {
     startTime = formatDateTime(start)
     endTime = formatDateTime(now)
   } else {
-    // 位置展示 - 用用户选的时间
+    // 位置展示 - 鐢ㄧ敤鎴烽€夌殑时间
     startTime = searchStartTime.value
     endTime = searchEndTime.value
   }
 
   trajectoryTimeRange.value = `${startTime.replace('T', ' ')} 至 ${endTime.replace('T', ' ')}`
 
+  // 缁ф壙褰撳墠椤甸潰鐨勬ā寮忓拰 CalStepSecond 璁剧疆
+  const isRealtime = activeMenu.value === 0
+    ? queryMode.value === 'realtime'
+    : searchQueryMode.value === 'realtime'
+  const stepSecond = activeMenu.value === 0 ? calStepSecond.value : searchCalStepSecond.value
+
   const params = new URLSearchParams({
     StartTime: startTime,
     EndTime: endTime,
-    LocateByCoummounication: 'true',
+    LocateByCoummounication: isRealtime ? 'true' : 'false',
     LocateByImeiOrTmsi: 'true',
-    TargetImeiOrTmsi: terminalId
+    TargetImeiOrTmsi: terminalId,
+    isshowdevice: 'true',
+    ...(isRealtime ? {} : { CalStepSecond: stepSecond })
   })
 
   await nextTick()
@@ -783,7 +1227,7 @@ async function queryTrajectory(terminalId) {
   }).addTo(trajectoryMap)
 
   try {
-    const resp = await fetch(`/api/Result/NewSearchCoordinate?${params}`)
+    const resp = await fetch(`/api/Result/SearchCoordinate?${params}`)
     const text = await resp.text()
     if (!text) return
     const result = JSON.parse(text)
@@ -801,8 +1245,7 @@ async function queryTrajectory(terminalId) {
       // 画轨迹线（浅蓝色）
       L.polyline(latlngs, { color: '#91d5ff', weight: 3, opacity: 0.9 }).addTo(trajectoryMap)
 
-      // 在每段线段中间画箭头（橙色 SVG）
-      // 注意：屏幕Y轴向下，纬度向上，所以dlat取反
+      // 在每段线段中间画箭头锛堟鑹?SVG锛?      // 注意锛氬睆骞昚轴向下嬶紝纬度向上锛屾墍浠lat鍙栧弽
       for (let i = 0; i < latlngs.length - 1; i++) {
         const from = latlngs[i]
         const to = latlngs[i + 1]
@@ -810,11 +1253,11 @@ async function queryTrajectory(terminalId) {
         const midLng = (from[1] + to[1]) / 2
         const dlat = to[0] - from[0]
         const dlng = to[1] - from[1]
-        // 墨卡托投影：经度方向在屏幕上缩短cos(lat)倍
+        // 墨卡托投影：经度方向在屏幕上缩短 cos(lat) 倍
         const cosLat = Math.cos(midLat * Math.PI / 180)
-        // 屏幕坐标：X=dlng*cosLat, Y=-dlat（Y轴向下）
+        // 屏幕坐标锛歑=dlng*cosLat, Y=-dlat锛圷轴向下嬶級
         const angleDeg = Math.atan2(-dlat, dlng * cosLat) * 180 / Math.PI
-        // SVG箭头初始朝右(0°)，关于中心点(14,7)对称
+        // SVG箭头初始朝右(0掳)锛屽叧浜庝腑蹇冪偣(14,7)瀵圭О
         const arrowSvg = `<svg width="28" height="14" viewBox="0 0 28 14" style="transform:rotate(${angleDeg}deg)"><polygon points="4,2 24,7 4,12" fill="#fa8c16" stroke="#e8740e" stroke-width="0.5"/></svg>`
         const arrowIcon = L.divIcon({
           html: arrowSvg,
@@ -825,18 +1268,18 @@ async function queryTrajectory(terminalId) {
         L.marker([midLat, midLng], { icon: arrowIcon, interactive: false }).addTo(trajectoryMap)
       }
 
-      // 起点标记（绿色）
+      // 起点标记锛堢豢鑹诧級
       L.circleMarker(latlngs[0], {
         radius: 9, fillColor: '#52c41a', color: '#fff', weight: 2, fillOpacity: 1
       }).addTo(trajectoryMap).bindPopup(`<b>起点</b><br>时间: ${formatDisplay(sorted[0].lastDataTime || sorted[0].startTime)}<br>经度: ${sorted[0].longitude.toFixed(6)}<br>纬度: ${sorted[0].latitude.toFixed(6)}`)
 
-      // 终点标记（红色）
+      // 终点标记锛堢孩鑹诧級
       const last = sorted[sorted.length - 1]
       L.circleMarker(latlngs[latlngs.length - 1], {
         radius: 9, fillColor: '#e74c3c', color: '#fff', weight: 2, fillOpacity: 1
       }).addTo(trajectoryMap).bindPopup(`<b>终点</b><br>时间: ${formatDisplay(last.lastDataTime || last.startTime)}<br>经度: ${last.longitude.toFixed(6)}<br>纬度: ${last.latitude.toFixed(6)}`)
 
-      // 中间点（深蓝色）
+      // 中间点癸紙深蓝色诧級
       for (let i = 1; i < sorted.length - 1; i++) {
         L.circleMarker(latlngs[i], {
           radius: 5, fillColor: '#1e3a5f', color: '#fff', weight: 1.5, fillOpacity: 0.9
@@ -899,7 +1342,7 @@ watch([queryMode, timeRange], () => {
   }
 })
 
-// 切换菜单时，清空数据并切换逻辑
+// 切换菜单时讹紝娓呯┖鏁版嵁骞跺垏鎹㈤€昏緫
 watch(activeMenu, (val) => {
   tableData.value = []
   if (map) {
@@ -907,7 +1350,7 @@ watch(activeMenu, (val) => {
     markers = []
   }
 
-  // 清除所有定时器
+  // 清除鎵€鏈夊畾鏃跺櫒
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
   if (deviceRefreshTimer) { clearInterval(deviceRefreshTimer); deviceRefreshTimer = null }
@@ -917,19 +1360,26 @@ watch(activeMenu, (val) => {
     handleRealtimeQuery()
     setupRefreshTimer()
   } else if (val === 1) {
-    initFileQueryTime()
+    if (!fileQueryStartTime.value) initFileQueryTime()
   } else if (val === 2) {
     nextTick(() => { if (map) map.invalidateSize() })
-    initSearchTime()
+    if (!searchStartTime.value) initSearchTime()
   } else if (val === 3) {
     fetchDeviceInfo()
     deviceRefreshTimer = setInterval(fetchDeviceInfo, 120000)
   }
 })
 
+// 点击页面其他区域关闭列筛选下拉
+function handleGlobalClick() {
+  if (activeFilterCol.value) activeFilterCol.value = null
+  if (lcwActiveFilterCol.value) lcwActiveFilterCol.value = null
+}
+
 onMounted(async () => {
+  document.addEventListener('click', handleGlobalClick)
   await nextTick()
-  // 初始化 Leaflet 地图
+  // 鍒濆鍖?Leaflet 鍦板浘
   map = L.map('map', {
     center: [30, 50],
     zoom: 3,
@@ -945,8 +1395,6 @@ onMounted(async () => {
     maxZoom: 19
   }).addTo(map)
 
-  document.addEventListener('click', closeFilterDropdown)
-
   // 首次加载数据
   handleRealtimeQuery()
   setupRefreshTimer()
@@ -956,10 +1404,10 @@ onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
   if (countdownTimer) clearInterval(countdownTimer)
   if (deviceRefreshTimer) clearInterval(deviceRefreshTimer)
-  document.removeEventListener('click', closeFilterDropdown)
+  document.removeEventListener('click', handleGlobalClick)
 })
 
-// 位置展示 - 查询（使用 NewSearchCoordinate 接口）
+// 位置展示 - 查询（使用 SearchCoordinate 接口）
 async function handleSearch() {
   if (!searchStartTime.value || !searchEndTime.value) return
 
@@ -969,12 +1417,14 @@ async function handleSearch() {
     StartTime: searchStartTime.value,
     EndTime: searchEndTime.value,
     LocateByCoummounication: isRealtime ? 'true' : 'false',
-    LocateByImeiOrTmsi: 'false',
-    TargetImeiOrTmsi: ''
+    LocateByImeiOrTmsi: searchTerminalId.value ? 'true' : 'false',
+    TargetImeiOrTmsi: searchTerminalId.value || '',
+    isshowdevice: 'true',
+    ...(isRealtime ? {} : { CalStepSecond: searchCalStepSecond.value })
   })
 
   try {
-    const resp = await fetch(`/api/Result/NewSearchCoordinate?${params}`)
+    const resp = await fetch(`/api/Result/SearchCoordinate?${params}`)
     const text = await resp.text()
     if (!text) return
     const result = JSON.parse(text)
@@ -982,8 +1432,9 @@ async function handleSearch() {
     if (result.data) {
       tableData.value = result.data.map(item => ({
         terminalId: item.terminalID || '',
-        startTime: formatDisplay(item.startTime),
-        endTime: formatDisplay(item.endTime),
+        chainID: getChainIdFromItem(item),
+        startTime: formatDisplayPlus8(item.startTime),
+        endTime: formatDisplayPlus8(item.endTime),
         duration: calcDuration(item.startTime, item.endTime),
         longitude: item.longitude,
         latitude: item.latitude,
@@ -999,9 +1450,9 @@ async function handleSearch() {
   }
 }
 
-// 软件控制 - 获取设备信息（固定三行，接口无返回时亮红灯）
+// 软件控制 - 获取设备信息锛堝浐瀹氫笁琛岋紝接口无返回时亮红灯級
 async function fetchDeviceInfo() {
-  // 先把所有设备标为离线，接口返回后再更新
+  // 鍏堟妸鎵€鏈夎澶囨爣涓虹绾匡紝接口返回后再更新
   deviceList.value.forEach(d => d.isOnline = false)
   try {
     const resp = await fetch('/api/Execution/GetMachineUsage')
@@ -1023,6 +1474,169 @@ async function fetchDeviceInfo() {
     })
   } catch (err) {
     console.error('获取设备信息失败:', err)
+  }
+}
+
+// 载荷淇℃伅寮圭獥
+const showPayloadModal = ref(false)
+const currentPayloadData = ref(null)
+
+const payloadSectionDefs = [
+  { key: 'commType',  label: '业务类型',  color: '#1890ff', type: 'tags' },
+  { key: 'signaling', label: '信令类型',  color: '#1890ff', type: 'tags' },
+  { key: 'tmsi',      label: 'TMSI',    color: '#722ed1', type: 'tags' },
+  { key: 'idappXYZ',  label: '播发经纬度', color: '#1890ff', type: 'tags' },
+  { key: 'acars',     label: 'ACARS',   color: '#1890ff', type: 'tags' },
+  { key: 'ira',       label: 'IRA',      color: '#1890ff', type: 'tags' },
+  { key: 'parsedDataTags', label: '解析数据', color: '#1890ff', type: 'tags' },
+  { key: 'sms',       label: '短信数据',  color: '#fa8c16', type: 'tags' },
+  { key: 'voiceWavs', label: '语音通话',  color: '#52c41a', type: 'wav'  },
+  { key: 'voiceInfo', label: '语音附加信息', color: '#52c41a', type: 'text' },
+]
+
+const currentPayloadSections = computed(() => {
+  if (!currentPayloadData.value) return []
+  return payloadSectionDefs
+    .map(def => {
+      const raw = currentPayloadData.value[def.key]
+      if (def.type === 'text') {
+        const text = (raw || '').trim()
+        return { ...def, text, values: [] }
+      }
+      const values = Array.isArray(raw) ? raw.filter(Boolean) : (raw ? [String(raw)] : [])
+      return { ...def, values }
+    })
+    .filter(s => s.type === 'text' ? s.text.length > 0 : s.values.length > 0)
+})
+
+function openPayloadModal(row) {
+  currentPayloadData.value = row.payloadData || null
+  showPayloadModal.value = true
+}
+
+function toArr(val) {
+  if (!val) return []
+  if (Array.isArray(val)) return val.filter(Boolean)
+  if (typeof val === 'object') return [JSON.stringify(val)]
+  return [String(val)]
+}
+
+function toText(val) {
+  if (val === null || val === undefined) return ''
+  if (Array.isArray(val)) return val.filter(Boolean).map(v => String(v)).join('\n')
+  if (typeof val === 'object') return JSON.stringify(val)
+  return String(val)
+}
+
+function splitMultiValueText(text) {
+  return String(text || '')
+    .split(/[\r\n,，;；]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+}
+
+function normalizeTmsiValues(val) {
+  const rawList = Array.isArray(val)
+    ? val.flatMap(v => splitMultiValueText(typeof v === 'object' ? JSON.stringify(v) : v))
+    : splitMultiValueText(typeof val === 'object' ? JSON.stringify(val) : val)
+
+  const normalized = rawList
+    .map(v => v.replace(/\s+/g, '').toUpperCase())
+    .filter(Boolean)
+
+  return [...new Set(normalized)]
+}
+
+function normalizeParsedData(raw) {
+  if (raw === null || raw === undefined) {
+    return { text: '', tags: [] }
+  }
+
+  if (Array.isArray(raw)) {
+    const tags = raw
+      .map(v => (typeof v === 'object' ? JSON.stringify(v) : String(v)))
+      .map(s => s.trim())
+      .filter(Boolean)
+    return { text: tags.join('\n'), tags }
+  }
+
+  if (typeof raw === 'object') {
+    const tags = Object.entries(raw)
+      .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+      .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+      .map(s => s.trim())
+      .filter(Boolean)
+    return { text: tags.join('\n'), tags }
+  }
+
+  const text = toText(raw).trim()
+  if (!text) return { text: '', tags: [] }
+  const tags = text
+    .split(/\r?\n|；|;/)
+    .map(s => s.trim())
+    .filter(Boolean)
+  return { text, tags: tags.length ? tags : [text] }
+}
+
+// 提取结构化载荷数据
+function extractPayloadData(item) {
+  const parsed = normalizeParsedData(item.payloadData ?? item.PayloadData ?? item.IdappRawLine ?? item.idappRawLine)
+  return {
+    commType:   toArr(item.commType),
+    signaling:  toArr(item['信令类型']),
+    tmsi:       normalizeTmsiValues(item.tmsi ?? item.Tmsi ?? item.TMSI),
+    idappXYZ:   toArr(item.idappXYZ ?? item.IdappXYZ),
+    acars:      toArr(item.acars ?? item.Acars),
+    ira:        toArr(item.ira ?? item.IRA),
+    sms:        toArr(item.sms ?? item.Sms ?? item.SMS),
+    ipData:     toArr(item.ipData ?? item.IPData ?? item.IpData ?? item.IpRawLine ?? item.ipRawLine),
+    voiceWavs:  toArr(item.VoiceWavs ?? item.voiceWavs),
+    voiceInfo:  (item.VoiceInfo ?? item.voiceInfo ?? '').trim(),
+    parsedData: parsed.text,
+    parsedDataTags: parsed.tags,
+    isLowSpeedData: !!(
+      item?.isLowSpeedData ??
+      item?.IsLowSpeedData ??
+      item?.['isLowSpeedData'] ??
+      item?.['IsLowSpeedData'] ??
+      item?.['低速数据'] ??
+      item?.['is低速数据'] ??
+      item?.['Is低速数据']
+    ),
+  }
+}
+
+// 格式化栬浇鑽蜂俊鎭负绾枃鏈紙鐢ㄤ簬列筛选夛級
+function formatPayloadInfo(item) {
+  const d = extractPayloadData(item)
+  const parts = []
+  if (d.commType.length) parts.push(`业务类型: ${d.commType.join(', ')}`)
+  if (d.signaling.length) parts.push(`信令类型: ${d.signaling.join(', ')}`)
+  if (d.tmsi.length) parts.push(`TMSI: ${d.tmsi.join(', ')}`)
+  if (d.idappXYZ.length) parts.push(`播发经纬度: ${d.idappXYZ.join(', ')}`)
+  if (d.acars.length) parts.push(`ACARS: ${d.acars.join(', ')}`)
+  if (d.ira.length) parts.push(`IRA: ${d.ira.join(', ')}`)
+  if (d.sms.length) parts.push(`短信数据: ${d.sms.join(', ')}`)
+  if (d.parsedData) parts.push(`解析数据: ${d.parsedData}`)
+  if (d.voiceWavs.length) parts.push(`语音通话: ${d.voiceWavs.length}条`)
+  if (d.voiceInfo) parts.push(`语音附加信息: ${d.voiceInfo}`)
+  return parts.join('\n')
+}
+
+function downloadWav(base64Data, chainID, index) {
+  try {
+    const binary = atob(base64Data)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const blob = new Blob([bytes], { type: 'audio/wav' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `voice_${chainID || 'unknown'}_${index + 1}.wav`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error('WAV涓嬭浇澶辫触', e)
   }
 }
 
@@ -1049,12 +1663,13 @@ async function fetchCommEvents() {
     commTableData.value = list.map(item => ({
       deviceNumber: item.deviceNumber || '',
       dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
-      startTime: formatDisplay(item.startTime),
-      endTime: formatDisplay(item.endTime),
+      startTime: formatDisplayPlus8(item.startTime),
+      endTime: formatDisplayPlus8(item.endTime),
       duration: parseDurationToSeconds(item.duration),
       imei: item.imei || '',
-      commType: item.commType || '',
-      locationLatLon: item.locationLatLon || '',
+      payloadInfo: formatPayloadInfo(item),
+      payloadData: extractPayloadData(item),
+      locationLatLon: formatLocationLatLon(item),
       chainID: item.chainID || ''
     }))
   } catch (err) {
@@ -1065,6 +1680,11 @@ async function fetchCommEvents() {
 // 内容查询
 async function handleFileQuery() {
   if (!fileQueryStartTime.value || !fileQueryEndTime.value) return
+
+  // 清空列过滤
+  fileQueryColumns.forEach(c => { if (fileQueryFilters[c.key]) fileQueryFilters[c.key].clear() })
+  activeFilterCol.value = null
+  fileQueryPage.value = 1
 
   loading.value = true
   const params = new URLSearchParams({
@@ -1086,12 +1706,13 @@ async function handleFileQuery() {
     fileQueryTableData.value = list.map(item => ({
       deviceNumber: item.deviceNumber || '',
       dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
-      startTime: formatDisplay(item.startTime),
-      endTime: formatDisplay(item.endTime),
+      startTime: formatDisplayPlus8(item.startTime),
+      endTime: formatDisplayPlus8(item.endTime),
       duration: parseDurationToSeconds(item.duration),
       imei: item.imei || '',
-      commType: item.commType || '',
-      locationLatLon: item.locationLatLon || '',
+      payloadInfo: formatPayloadInfo(item),
+      payloadData: extractPayloadData(item),
+      locationLatLon: formatLocationLatLon(item),
       chainID: item.chainID || ''
     }))
   } catch (err) {
@@ -1099,6 +1720,42 @@ async function handleFileQuery() {
   } finally {
     loading.value = false
   }
+}
+
+function csvEscape(val) {
+  const s = String(val ?? '')
+    .replace(/\r?\n+/g, ' | ')
+    .trim()
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
+function normalizeExportCell(key, val) {
+  const text = String(val ?? '')
+  if (key === 'deviceNumber') {
+    return text.replace(/[，,]+/g, ' ').replace(/\s+/g, ' ').trim()
+  }
+  return text
+}
+
+function handleFileQueryExport() {
+  const cols = fileQueryColumns
+  const header = cols.map(c => csvEscape(c.label)).join(',')
+  const rows = fileQueryFilteredData.value.map(row =>
+    cols.map(c => csvEscape(normalizeExportCell(c.key, row?.[c.key] ?? ''))).join(',')
+  )
+  const csv = [header, ...rows].join('\r\n')
+
+  const now = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `content_query_${ts}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function handleFileQueryReset() {
@@ -1109,6 +1766,16 @@ function handleFileQueryReset() {
   fileQueryTableData.value = []
   fileQueryPage.value = 1
   fileQueryColumns.forEach(c => fileQueryFilters[c.key] = new Set())
+  payloadFilterCommType.value = false
+  payloadFilterSignaling.value = false
+  payloadFilterIdappXYZ.value = false
+  payloadFilterAircraft.value = false
+  payloadFilterVoice.value = false
+  payloadFilterSms.value = false
+  payloadFilterIp.value = false
+  payloadFilterLowSpeed.value = false
+  payloadFilterIdapp.value = false
+  fileQueryImeiFilter.value = ''
 }
 
 function initFileQueryTime() {
@@ -1118,8 +1785,8 @@ function initFileQueryTime() {
   fileQueryStartTime.value = formatDateTimeLocal(oneHourAgo)
 }
 
-function openMeshPage(ip) {
-  if (ip) window.open(`http://${ip}/`, '_blank')
+function openMeshPage(deviceNum) {
+  window.open(`http://192.168.104.${deviceNum}/`, '_blank')
 }
 
 function handleExport() {
@@ -1134,21 +1801,29 @@ function handleExport() {
     locateByImei = 'false'
     targetImei = ''
   } else if (activeMenu.value === 2) {
+    const isRealtime = searchQueryMode.value === 'realtime'
     startTime = searchStartTime.value
     endTime = searchEndTime.value
-    locateByComm = 'true'
-    locateByImei = 'false'
-    targetImei = ''
+    locateByComm = isRealtime ? 'true' : 'false'
+    locateByImei = searchTerminalId.value ? 'true' : 'false'
+    targetImei = searchTerminalId.value || ''
   } else {
     return
   }
+
+  const isRealtimeExport = activeMenu.value === 0
+    ? queryMode.value === 'realtime'
+    : searchQueryMode.value === 'realtime'
+  const stepSecondExport = activeMenu.value === 0 ? calStepSecond.value : searchCalStepSecond.value
 
   const params = new URLSearchParams({
     StartTime: startTime,
     EndTime: endTime,
     LocateByCoummounication: locateByComm,
     LocateByImeiOrTmsi: locateByImei,
-    TargetImeiOrTmsi: targetImei
+    TargetImeiOrTmsi: targetImei,
+    isshowdevice: 'true',
+    ...(isRealtimeExport ? {} : { CalStepSecond: stepSecondExport })
   })
 
   window.open(`/api/Result/DownloadSearchCoordinateCSV?${params}`, '_blank')
@@ -1187,7 +1862,7 @@ html, body, #app {
   overflow: hidden;
 }
 
-/* ===== 左侧导航栏 ===== */
+/* ===== 左侧导航栏===== */
 .sidebar {
   width: 180px;
   min-width: 180px;
@@ -1271,7 +1946,7 @@ html, body, #app {
   overflow: hidden;
 }
 
-/* ===== 顶部工具栏 ===== */
+/* ===== 顶部工具栏===== */
 .toolbar {
   height: 46px;
   min-height: 46px;
@@ -1319,7 +1994,7 @@ html, body, #app {
   height: 100%;
 }
 
-/* 实时位置 - 地图右上角控件 */
+/* 实时位置 - 地图右上角控件*/
 .map-controls {
   position: absolute;
   top: 12px;
@@ -1379,7 +2054,7 @@ html, body, #app {
   box-shadow: 0 4px 10px rgba(24, 144, 255, 0.35);
 }
 
-/* 位置展示 - 顶部查询栏 */
+/* 位置展示 - 顶部查询栏*/
 .map-controls-bar {
   position: absolute;
   top: 0;
@@ -1450,6 +2125,21 @@ html, body, #app {
   color: #bbb;
   font-weight: 300;
 }
+
+.imei-filter-input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #2c3e50;
+  width: 150px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.imei-filter-input:hover { border-color: #b0b0b0; }
+.imei-filter-input:focus { outline: none; border-color: #1890ff; box-shadow: 0 0 0 2px rgba(24,144,255,0.15); }
+.imei-filter-input::placeholder { color: #bbb; }
 
 .query-btn {
   height: 34px;
@@ -1532,7 +2222,7 @@ tbody tr:hover {
   font-size: 13px;
 }
 
-/* ===== 内容查询页 ===== */
+/* ===== 内容查询页===== */
 .file-query-page {
   flex: 1;
   display: flex;
@@ -1547,9 +2237,24 @@ tbody tr:hover {
   gap: 12px;
   padding: 14px 20px;
   background: #fff;
+  border-bottom: 1px solid #e8e8e8;
+  flex-wrap: wrap;
+}
+.payload-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 20px;
+  background: #fafafa;
   border-bottom: 1px solid #e0e0e0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   flex-wrap: wrap;
+}
+.payload-filter-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c3e50;
+  white-space: nowrap;
 }
 
 .checkbox-label {
@@ -1594,15 +2299,16 @@ tbody tr:hover {
   flex: 1;
   overflow: auto;
   padding: 16px;
+  /* 鎶婂渾瑙掑拰闃村奖鏀惧湪婊氬姩瀹瑰櫒涓婏紝涓嶅湪 table 涓婅 overflow:hidden锛?     鍚﹀垯浼氶樆鏂?th 鐨?position:sticky */
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .file-query-table-wrapper .device-table {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border-radius: 8px;
-  overflow: hidden;
+  border-radius: 0;
 }
 
-/* ===== 列筛选 ===== */
+/* ===== 列筛选===== */
 .filterable-th {
   position: relative;
 }
@@ -1636,10 +2342,8 @@ tbody tr:hover {
 }
 
 .filter-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 3000;
+  position: fixed;
+  z-index: 9999;
   width: 220px;
   background: #fff;
   border-radius: 8px;
@@ -1808,7 +2512,7 @@ tbody tr:hover {
   color: #fff !important;
 }
 
-/* ===== 软件控制 - 设备信息页 ===== */
+/* ===== 软件控制 - 设备信息页===== */
 .device-page {
   flex: 1;
   padding: 24px;
@@ -1828,30 +2532,53 @@ tbody tr:hover {
 }
 
 .device-table {
-  width: 100%;
+  width: auto;
+  min-width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
 }
+.file-query-fixed-table {
+  table-layout: fixed;
+  width: 1080px;
+}
+/* 实时位置搴曢儴閫氫俊浜嬩欢琛?*/
+.table-panel .device-table { table-layout: fixed; width: 100%; }
+.table-panel .device-table th:nth-child(1), .table-panel .device-table td:nth-child(1) { width: 65px; }
+.table-panel .device-table th:nth-child(2), .table-panel .device-table td:nth-child(2) { width: 160px; }
+.table-panel .device-table th:nth-child(3), .table-panel .device-table td:nth-child(3) { width: 140px; }
+.table-panel .device-table th:nth-child(4), .table-panel .device-table td:nth-child(4) { width: 140px; }
+.table-panel .device-table th:nth-child(5), .table-panel .device-table td:nth-child(5) { width: 85px; }
+.table-panel .device-table th:nth-child(6), .table-panel .device-table td:nth-child(6) { width: 120px; }
+.table-panel .device-table th:nth-child(7), .table-panel .device-table td:nth-child(7) { width: 170px; }
+.table-panel .device-table th:nth-child(8), .table-panel .device-table td:nth-child(8) { width: 80px; }
+.table-panel .device-table th:nth-child(9), .table-panel .device-table td:nth-child(9) { width: 130px; }
 
 .device-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   background: #fafafa;
+  box-shadow: 0 2px 0 #e8e8e8;
   color: #1890ff;
   font-weight: 600;
   font-size: 12px;
-  padding: 5px 8px;
+  padding: 5px 4px;
   text-align: center;
   border-bottom: 2px solid #e8e8e8;
   position: sticky;
   top: 0;
   z-index: 1;
+  white-space: nowrap;
 }
 
 .device-table td {
-  padding: 5px 8px;
+  padding: 5px 4px;
   text-align: center;
   font-size: 12px;
   color: #444;
   border-bottom: 1px solid #f0f0f0;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .device-table tbody tr {
@@ -1903,7 +2630,7 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-/* ===== 倒计时徽章 ===== */
+/* ===== 倒计时徽章===== */
 .countdown-badge {
   display: inline-flex;
   align-items: center;
@@ -1963,6 +2690,22 @@ tbody tr:hover {
   font-weight: 500;
 }
 
+/* 閲嶅彔鐐硅仛鍚堝浘鏍囷紙SVG 娓叉煋锛屾棤闇€棰濆鏍峰紡锛?*/
+/* 灞曞紑鍚庝腑蹇冪殑鏀惰捣鎸夐挳 */
+.map-cluster-collapse {
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
 /* 设备图钉图标 */
 .pin-icon {
   background: none !important;
@@ -1978,7 +2721,7 @@ tbody tr:hover {
   border-radius: 6px !important;
 }
 
-/* 滚动条美化 */
+/* 滚动条美化*/
 .table-wrapper::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -2009,8 +2752,8 @@ tbody tr:hover {
 }
 .trajectory-modal {
   background: #fff;
-  width: 80vw;
-  height: 75vh;
+  width: 90vw;
+  height: 85vh;
   border-radius: 8px;
   overflow: hidden;
   display: flex;
@@ -2043,11 +2786,112 @@ tbody tr:hover {
   flex: 1;
   position: relative;
 }
-.payload-cell {
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.lcw-detail-wrapper {
+  padding: 10px 12px 12px;
+}
+.lcw-detail-table th,
+.lcw-detail-table td {
+  padding: 7px 10px;
+}
+.payload-btn {
+  padding: 2px 10px;
+  background: #1890ff;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
   white-space: nowrap;
+  transition: background 0.15s;
+}
+.payload-btn:hover {
+  background: #096dd9;
+}
+.payload-modal {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  width: 560px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.payload-modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.payload-section {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+}
+.payload-section-label {
+  flex-shrink: 0;
+  width: 80px;
+  font-size: 12px;
+  font-weight: 600;
+  padding-top: 4px;
+  text-align: right;
+}
+.payload-tags {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wav-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid #52c41a;
+  background: #f6ffed;
+  color: #389e0d;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.wav-download-btn:hover {
+  background: #d9f7be;
+}
+.wav-icon {
+  font-size: 10px;
+}
+.payload-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+.payload-text-line {
+  display: block;
+  font-size: 12px;
+  color: #389e0d;
+  line-height: 1.6;
+  word-break: break-all;
+}
+.payload-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid #91caff;
+  font-size: 12px;
+  line-height: 1.6;
+  background: #e6f4ff;
+  color: #0958d9;
+  word-break: break-all;
+}
+.detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 .detail-btn {
   padding: 2px 10px;
@@ -2061,6 +2905,21 @@ tbody tr:hover {
 }
 .detail-btn:hover {
   background: #096dd9;
+}
+.detail-export-btn {
+  padding: 2px 10px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #d9d9d9;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.detail-export-btn:hover {
+  color: #1890ff;
+  border-color: #1890ff;
 }
 .arrow-icon {
   background: none !important;

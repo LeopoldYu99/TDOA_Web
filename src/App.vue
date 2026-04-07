@@ -1652,7 +1652,7 @@ async function fetchCommEvents() {
   const params = new URLSearchParams({
     StartTime: formatDateTime(startTime),
     EndTime: formatDateTime(now),
-    OnlyUl: 'false',
+    HasUl: 'false',
     Count: '100'
   })
 
@@ -1695,7 +1695,7 @@ async function handleFileQuery() {
   const params = new URLSearchParams({
     StartTime: fileQueryStartTime.value,
     EndTime: fileQueryEndTime.value,
-    OnlyUl: String(fileQueryOnlyUl.value),
+    HasUl: String(fileQueryOnlyUl.value),
     OnlyImei: String(fileQueryOnlyImei.value),
     Count: '100000'
   })

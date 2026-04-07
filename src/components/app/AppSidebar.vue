@@ -67,6 +67,7 @@
 </template>
 
 <script setup>
+// 侧栏本身没有业务状态，只接收当前激活项并把点击事件抛给父组件。
 defineProps({
   menuItems: {
     type: Array,

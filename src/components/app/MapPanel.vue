@@ -70,6 +70,8 @@
 <script setup>
 import { computed } from 'vue'
 
+// 地图区域本身由父组件里的 Leaflet 逻辑控制，
+// 这里主要负责顶部查询条、按钮和 loading 状态的展示。
 const props = defineProps({
   activeMenu: {
     type: Number,
@@ -131,6 +133,8 @@ const emit = defineEmits([
   'export',
 ])
 
+// 这一组 computed 是“v-model 代理层”：
+// 子组件读 props，修改时通过 emit 告诉父组件去更新真正的状态。
 const queryModeModel = computed({
   get: () => props.queryMode,
   set: value => emit('update:queryMode', value),

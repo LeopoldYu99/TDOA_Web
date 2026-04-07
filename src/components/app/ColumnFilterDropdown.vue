@@ -40,6 +40,8 @@
 </template>
 
 <script setup>
+// 这个下拉框是“通用组件”，
+// 文件查询表和 LCW 详情表都在复用它，所以只保留最通用的输入和事件。
 defineProps({
   visible: {
     type: Boolean,

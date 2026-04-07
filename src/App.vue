@@ -180,6 +180,8 @@ const searchTerminalId = ref('')
 const showLCWModal = ref(false)
 const lcwDetailData = ref([])
 const lcwLoading = ref(false)
+// 这一组列定义既决定表头显示，也决定导出 CSV 时的列顺序。
+// 后面如果你想给 LCW 详情加字段，通常先从这里开始改。
 const lcwDetailColumns = [
   { key: 'deviceNumber', label: '设备编号' },
   { key: 'time', label: '时间' },
@@ -191,6 +193,8 @@ const lcwDetailColumns = [
   { key: 'frameType', label: '帧类型' },
   { key: 'rawLine', label: '原始数据' },
 ]
+// 每一列都用一个 Set 保存“当前勾选的值”。
+// 例如某列勾选了 “上行” 和 “下行”，对应的 Set 就会有两个字符串。
 const lcwDetailFilters = reactive(
   Object.fromEntries(lcwDetailColumns.map(c => [c.key, new Set()]))
 )
@@ -200,8 +204,10 @@ const lcwFilterDropdownPos = ref({ top: 0, left: 0 })
 
 const lcwDetailFilteredData = computed(() => {
   return lcwDetailData.value.filter(row => {
+    // every 的意思是：所有列都通过筛选，这一行才保留。
     return lcwDetailColumns.every(col => {
       const selected = lcwDetailFilters[col.key]
+      // 这一列如果一个选项都没勾，就等于“不限制这一列”。
       if (!selected || selected.size === 0) return true
       return selected.has(String(row[col.key] || ''))
     })
@@ -227,6 +233,7 @@ const fileQueryImeiFilter = ref('')
 
 // 内容查询额外过滤
 // payloadFilterLocationLatLon 用来筛出“拥有定位经纬度”的结果，和列筛选互补。
+// 这里拆成多个 ref，是因为每个复选框都需要一个独立的布尔状态。
 const payloadFilterLocationLatLon = ref(false)
 const payloadFilterSignaling = ref(false)
 const payloadFilterIdappXYZ = ref(false)
@@ -278,6 +285,7 @@ function toggleFilterDropdown(key, event) {
   if (activeFilterCol.value === key) {
     activeFilterCol.value = null
   } else {
+    // 这里记录“当前打开的是哪一列的下拉框”，模板里会据此切换内容。
     activeFilterCol.value = key
     filterSearchText.value = ''
     // 用按钮坐标定位，避免被 overflow:auto 裁剪
@@ -357,6 +365,9 @@ function lcwFilterClearAll(key) {
 
 const fileQueryFilteredData = computed(() => {
   return fileQueryTableData.value.filter(row => {
+    // 这里的 filter 相当于“多重关卡”：
+    // 只要任何一个条件不满足，就 return false 把这一行排除掉。
+
     // IMEI 文本过滤（前端，模糊匹配）
     if (fileQueryImeiFilter.value.trim()) {
       const kw = fileQueryImeiFilter.value.trim().toLowerCase()
@@ -376,6 +387,8 @@ const fileQueryFilteredData = computed(() => {
     if (payloadFilterLocationLatLon.value && !String(row.locationLatLon || '').trim()) return false
 
     // 载荷过滤（勾选的条件必须全部满足）
+    // row.payloadData 是我们在请求返回后提前整理好的结构化数据，
+    // 这样这里判断时就不用每次都重新解析原始字段。
     const d = row.payloadData || {}
     if (payloadFilterSignaling.value && !(d.signaling?.length > 0)) return false
     if (payloadFilterIdappXYZ.value && !(d.idappXYZ?.length > 0)) return false
@@ -395,11 +408,13 @@ const fileQueryTotalPages = computed(() =>
 )
 
 const fileQueryPagedData = computed(() => {
+  // 前端分页的本质就是“截取数组的一段”。
   const start = (fileQueryPage.value - 1) * fileQueryPageSize
   return fileQueryFilteredData.value.slice(start, start + fileQueryPageSize)
 })
 
 const fileQueryVisiblePages = computed(() => {
+  // 分页按钮不把所有页码都显示出来，只显示当前页附近的一小段。
   const total = fileQueryTotalPages.value
   const current = fileQueryPage.value
   const pages = []
@@ -870,6 +885,7 @@ function updateMapMarkers(data) {
 
 // 查询LCW详情
 async function showLCWDetail(row) {
+  // 打开弹窗前先把旧数据和旧筛选状态清空，避免看到上一次查询残留。
   showLCWModal.value = true
   lcwDetailData.value = []
   lcwLoading.value = true
@@ -887,6 +903,8 @@ async function showLCWDetail(row) {
 
 // 查询轨迹
 function getLCWQueryTimeRangeForDetail() {
+  // LCW 详情要跟随“当前页面上下文”的时间范围。
+  // 在实时位置页，时间来自右上角时间范围；在内容查询页，时间来自查询栏。
   if (activeMenu.value === 0) {
     const now = new Date()
     const hours = timeRangeHours[timeRange.value] || 2
@@ -903,6 +921,8 @@ function getLCWQueryTimeRangeForDetail() {
 }
 
 function mapLCWDetailRowsForUI(list) {
+  // 后端字段命名不完全统一，所以这里做一次兼容映射，
+  // 后续表格渲染就能只认一种固定结构。
   return (list || []).map(item => ({
     deviceNumber: item.deviceName ?? item.DeviceName ?? item.deviceNumber ?? item.DeviceNumber ?? '',
     time: formatDisplayPlus8(item.time ?? item.Time),
@@ -933,6 +953,7 @@ async function fetchLCWDetailRows(row) {
 
 async function handleLCWDetailExport(row) {
   try {
+    // 导出时复用同一份查询逻辑，避免“表格里看到的”和“导出的”不一致。
     const rows = await fetchLCWDetailRows(row)
     const cols = lcwDetailColumns
     const header = cols.map(c => csvEscape(c.label)).join(',')
@@ -951,7 +972,7 @@ async function handleLCWDetailExport(row) {
     a.click()
     URL.revokeObjectURL(url)
   } catch (err) {
-    console.error('导出LCW详情澶辫触:', err)
+    console.error('导出LCW详情失败:', err)
   }
 }
 
@@ -1039,9 +1060,10 @@ async function queryTrajectory(terminalId) {
         const dlng = to[1] - from[1]
         // 墨卡托投影：经度方向在屏幕上缩短 cos(lat) 倍
         const cosLat = Math.cos(midLat * Math.PI / 180)
-        // 屏幕坐标锛歑=dlng*cosLat, Y=-dlat锛圷轴向下嬶級
+        // 先把经纬度差转换成近似“屏幕方向向量”，再用 atan2 算旋转角度。
+        // 这里 X 近似等于经度差，Y 近似等于纬度差，但要考虑地图投影缩放。
         const angleDeg = Math.atan2(-dlat, dlng * cosLat) * 180 / Math.PI
-        // SVG箭头初始朝右(0掳)锛屽叧浜庝腑蹇冪偣(14,7)瀵圭О
+        // 箭头原图默认朝右，所以这里只需要给外层 svg 旋转角度即可。
         const arrowSvg = `<svg width="28" height="14" viewBox="0 0 28 14" style="transform:rotate(${angleDeg}deg)"><polygon points="4,2 24,7 4,12" fill="#fa8c16" stroke="#e8740e" stroke-width="0.5"/></svg>`
         const arrowIcon = L.divIcon({
           html: arrowSvg,
@@ -1202,6 +1224,8 @@ async function handleSearch() {
   if (!searchStartTime.value || !searchEndTime.value) return
 
   loading.value = true
+  // SearchCoordinate 同时支持“按通信定位”和“按终端 ID 定位”，
+  // 所以这里把页面上的多个输入统一折叠成接口参数。
   const isRealtime = searchQueryMode.value === 'realtime'
   const params = new URLSearchParams({
     StartTime: searchStartTime.value,
@@ -1240,9 +1264,10 @@ async function handleSearch() {
   }
 }
 
-// 软件控制 - 获取设备信息锛堝浐瀹氫笁琛岋紝接口无返回时亮红灯級
+// 软件控制 - 获取设备信息（固定三台设备，没有返回时保持离线）
 async function fetchDeviceInfo() {
-  // 鍏堟妸鎵€鏈夎澶囨爣涓虹绾匡紝接口返回后再更新
+  // 先全部标记为离线，再按接口结果逐个回填。
+  // 这样当接口失败时，界面不会误以为设备还在线。
   deviceList.value.forEach(d => d.isOnline = false)
   try {
     const resp = await fetch('/api/Execution/GetMachineUsage')
@@ -1268,6 +1293,8 @@ async function fetchDeviceInfo() {
 }
 
 function applyDeviceConfiguration(data) {
+  // 这一层专门负责“把接口数据灌进表单”，
+  // 好处是加载配置、保存后刷新配置都能复用它。
   deviceConfigRaw.value = data ? { ...data } : null
   deviceConfigMeta.deviceGuid = data?.deviceGuid || ''
   deviceConfigForm.isCenterNode = !!data?.isCenterNode
@@ -1301,6 +1328,7 @@ async function fetchDeviceConfiguration() {
 }
 
 function buildDeviceConfigPayload() {
+  // 提交时保留原始对象里我们没有编辑的字段，避免误删服务端已有配置。
   const base = deviceConfigRaw.value ? { ...deviceConfigRaw.value } : {}
   return {
     ...base,
@@ -1428,6 +1456,8 @@ const payloadSectionDefs = [
 
 const currentPayloadSections = computed(() => {
   if (!currentPayloadData.value) return []
+  // payloadSectionDefs 定义“有哪些展示区块”，
+  // 这里再根据实际数据决定哪些区块真的显示出来。
   return payloadSectionDefs
     .map(def => {
       const raw = currentPayloadData.value[def.key]
@@ -1447,6 +1477,8 @@ function openPayloadModal(row) {
 }
 
 function toArr(val) {
+  // 后端有时给数组，有时给单个值，甚至会给对象。
+  // 统一转成数组以后，模板里渲染会简单很多。
   if (!val) return []
   if (Array.isArray(val)) return val.filter(Boolean)
   if (typeof val === 'object') return [JSON.stringify(val)]
@@ -1454,6 +1486,7 @@ function toArr(val) {
 }
 
 function toText(val) {
+  // 和 toArr 类似，这里把不同类型统一成字符串，方便直接显示。
   if (val === null || val === undefined) return ''
   if (Array.isArray(val)) return val.filter(Boolean).map(v => String(v)).join('\n')
   if (typeof val === 'object') return JSON.stringify(val)
@@ -1461,6 +1494,7 @@ function toText(val) {
 }
 
 function splitMultiValueText(text) {
+  // 一个字段里可能用换行、逗号、分号混着分隔多个值，这里一次性拆开。
   return String(text || '')
     .split(/[\r\n,，;；]+/)
     .map(s => s.trim())
@@ -1468,6 +1502,8 @@ function splitMultiValueText(text) {
 }
 
 function normalizeTmsiValues(val) {
+  // TMSI 经常出现大小写、空格不一致的问题，
+  // 所以这里先标准化，再去重，避免界面显示很多“看起来不同其实相同”的值。
   const rawList = Array.isArray(val)
     ? val.flatMap(v => splitMultiValueText(typeof v === 'object' ? JSON.stringify(v) : v))
     : splitMultiValueText(typeof val === 'object' ? JSON.stringify(val) : val)
@@ -1480,6 +1516,10 @@ function normalizeTmsiValues(val) {
 }
 
 function normalizeParsedData(raw) {
+  // 解析数据字段格式最不稳定，所以这里单独做归一化。
+  // 最终统一返回：
+  // 1. text: 适合直接展示的大文本
+  // 2. tags: 适合拆成标签的小块文本
   if (raw === null || raw === undefined) {
     return { text: '', tags: [] }
   }
@@ -1512,6 +1552,9 @@ function normalizeParsedData(raw) {
 
 // 提取结构化载荷数据
 function extractPayloadData(item) {
+  // 这是内容查询里很核心的一步：
+  // 把后端原始字段整理成前端自己的统一结构。
+  // 这样后面的弹窗、过滤、导出都可以共用同一份数据。
   const parsed = normalizeParsedData(item.payloadData ?? item.PayloadData ?? item.IdappRawLine ?? item.idappRawLine)
   const rawIsIp =
     item?.isIp ??
@@ -1551,6 +1594,8 @@ function extractPayloadData(item) {
 
 // 格式化载荷信息为纯文本（用于列筛选）
 function formatPayloadInfo(item) {
+  // 表格单元格本身不直接显示这些文字，
+  // 但导出、调试、以及某些扩展场景会用到这段汇总文本。
   const d = extractPayloadData(item)
   const parts = []
   if (d.commType.length) parts.push(`业务类型: ${d.commType.join(', ')}`)
@@ -1568,6 +1613,7 @@ function formatPayloadInfo(item) {
 
 function downloadWav(base64Data, chainID, index) {
   try {
+    // 浏览器不能直接下载 base64 文本，需要先转成二进制 Blob。
     const binary = atob(base64Data)
     const bytes = new Uint8Array(binary.length)
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
@@ -1603,6 +1649,8 @@ async function fetchCommEvents() {
     if (!text) return
     const result = JSON.parse(text)
     const list = result.data || []
+    // 这里就先把后端记录加工成“界面直接可用”的结构，
+    // 这样模板里只负责显示，不需要再写一堆兼容判断。
     commTableData.value = list.map(item => ({
       deviceNumber: item.deviceNumber || '',
       dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
@@ -1624,7 +1672,8 @@ async function fetchCommEvents() {
 async function handleFileQuery() {
   if (!fileQueryStartTime.value || !fileQueryEndTime.value) return
 
-  // 清空列过滤
+  // 重新查询时清空列过滤。
+  // 否则用户改了时间范围之后，还会被旧的列筛选条件继续限制。
   fileQueryColumns.forEach(c => { if (fileQueryFilters[c.key]) fileQueryFilters[c.key].clear() })
   activeFilterCol.value = null
   fileQueryPage.value = 1
@@ -1646,6 +1695,7 @@ async function handleFileQuery() {
     const result = JSON.parse(text)
     const list = result.data || []
     fileQueryPage.value = 1
+    // 和实时位置表一样，先把接口数据整理成前端自己的统一结构。
     fileQueryTableData.value = list.map(item => ({
       deviceNumber: item.deviceNumber || '',
       dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
@@ -1666,6 +1716,7 @@ async function handleFileQuery() {
 }
 
 function csvEscape(val) {
+  // CSV 里如果包含逗号、双引号、换行，必须转义，否则 Excel 打开会错列。
   const s = String(val ?? '')
     .replace(/\r?\n+/g, ' | ')
     .trim()
@@ -1674,6 +1725,7 @@ function csvEscape(val) {
 }
 
 function normalizeExportCell(key, val) {
+  // 个别列在导出时需要稍微“洗一下”文本，避免出现多余分隔符。
   const text = String(val ?? '')
   if (key === 'deviceNumber') {
     return text.replace(/[，,]+/g, ' ').replace(/\s+/g, ' ').trim()
@@ -1682,6 +1734,8 @@ function normalizeExportCell(key, val) {
 }
 
 function handleFileQueryExport() {
+  // 导出的是“当前筛选结果”，而不是原始全部数据。
+  // 所以这里要基于 fileQueryFilteredData，而不是 fileQueryTableData。
   const cols = fileQueryColumns
   const header = cols.map(c => csvEscape(c.label)).join(',')
   const rows = fileQueryFilteredData.value.map(row =>
@@ -1702,6 +1756,8 @@ function handleFileQueryExport() {
 }
 
 function handleFileQueryReset() {
+  // 这个函数现在主要给初始化和未来扩展用。
+  // 如果后面你加了更多查询条件，记得在这里一起恢复默认值。
   initFileQueryTime()
   fileQueryOnlyUl.value = true
   fileQueryOnlyImei.value = true

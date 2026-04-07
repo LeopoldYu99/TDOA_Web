@@ -110,6 +110,9 @@
 <script setup>
 import { computed } from 'vue'
 
+// 这个组件只负责“内容查询页的展示”。
+// 真正的数据请求、过滤规则、分页计算都放在 App.vue 里，
+// 所以这里通过 props 接收数据，再通过 emit 把用户操作告诉父组件。
 const props = defineProps({
   fileQueryStartTime: {
     type: String,
@@ -226,6 +229,8 @@ const emit = defineEmits([
   'export-lcw-detail',
 ])
 
+// Vue 不允许直接修改 props，所以这里用 computed 包一层，
+// 把子组件里的 v-model 转成 “读 props / 发 update 事件” 的标准写法。
 const fileQueryStartTimeModel = computed({
   get: () => props.fileQueryStartTime,
   set: value => emit('update:fileQueryStartTime', value),
@@ -298,6 +303,7 @@ const payloadFilterIdappModel = computed({
 })
 
 function setPage(page) {
+  // 页码切换也统一交给父组件处理，这样分页展示和分页数据永远同步。
   emit('update:fileQueryPage', page)
 }
 </script>

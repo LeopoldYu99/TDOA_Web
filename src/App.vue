@@ -1587,7 +1587,7 @@ function extractPayloadData(item) {
     idappXYZ:   toArr(item.idappXYZ ?? item.IdappXYZ),
     acars:      toArr(item.acars ?? item.Acars),
     ira:        toArr(item.ira ?? item.IRA),
-    sms:        toArr(item.sms ?? item.Sms ?? item.SMS),
+    sms:        toArr(item['短信'] ?? item.sms ?? item.Sms ?? item.SMS),
     ipData:     toArr(item.ipData ?? item.IPData ?? item.IpData ?? item.IpRawLine ?? item.ipRawLine),
     isIp:       rawIsIp === true || rawIsIp === 1 || String(rawIsIp ?? '').toLowerCase() === 'true' || String(rawIsIp ?? '') === '1',
     voiceWavs:  toArr(item.VoiceWavs ?? item.voiceWavs),

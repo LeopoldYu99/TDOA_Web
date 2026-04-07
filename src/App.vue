@@ -391,23 +391,6 @@ const fileQueryFilteredData = computed(() => {
       return selected.has(String(row[col.key] || ''))
     })) return false
 
-    // “定位经纬度”来自结果行本身，不依赖载荷解析结果。
-    // 这里只要 locationLatLon 有值，就认为该条记录拥有可展示的定位数据。
-    if (payloadFilterLocationLatLon.value && !String(row.locationLatLon || '').trim()) return false
-
-    // 载荷过滤（勾选的条件必须全部满足）
-    // row.payloadData 是我们在请求返回后提前整理好的结构化数据，
-    // 这样这里判断时就不用每次都重新解析原始字段。
-    const d = row.payloadData || {}
-    if (payloadFilterSignaling.value && !(d.signaling?.length > 0)) return false
-    if (payloadFilterIdappXYZ.value && !(d.idappXYZ?.length > 0)) return false
-    if (payloadFilterAircraft.value && !(d.acars?.length > 0)) return false
-    if (payloadFilterVoice.value && !(d.voiceWavs?.length > 0)) return false
-    if (payloadFilterSms.value && !(d.sms?.length > 0)) return false
-    if (payloadFilterIp.value && !d.isIp) return false
-    if (payloadFilterLowSpeed.value && !d.isLowSpeedData) return false
-    if (payloadFilterIdapp.value && !d.parsedData) return false
-
     return true
   })
 })
@@ -1697,6 +1680,15 @@ async function handleFileQuery() {
     EndTime: fileQueryEndTime.value,
     HasUl: String(fileQueryOnlyUl.value),
     OnlyImei: String(fileQueryOnlyImei.value),
+    'Has定位经纬度': String(payloadFilterLocationLatLon.value),
+    'Has信令类型': String(payloadFilterSignaling.value),
+    'Has播发经纬度': String(payloadFilterIdappXYZ.value),
+    'HasACARS': String(payloadFilterAircraft.value),
+    'Has语音通话': String(payloadFilterVoice.value),
+    'Has短信数据': String(payloadFilterSms.value),
+    'HasIP数据': String(payloadFilterIp.value),
+    'Has低速数据': String(payloadFilterLowSpeed.value),
+    'Has解析数据': String(payloadFilterIdapp.value),
     Count: '100000'
   })
 

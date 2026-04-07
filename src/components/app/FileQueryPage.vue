@@ -32,7 +32,7 @@
       </div>
 
       <div class="payload-filter-bar">
-        <span style="font-weight: 500; color: #666; flex-shrink: 0">载荷过滤：</span>
+        <span style="font-weight: 500; color: #666; flex-shrink: 0">载荷查询条件：</span>
         <a-checkbox :checked="payloadFilterLocationLatLon" @update:checked="v => emit('update:payloadFilterLocationLatLon', v)">定位经纬度</a-checkbox>
         <a-checkbox :checked="payloadFilterSignaling" @update:checked="v => emit('update:payloadFilterSignaling', v)">信令类型</a-checkbox>
         <a-checkbox :checked="payloadFilterIdappXYZ" @update:checked="v => emit('update:payloadFilterIdappXYZ', v)">播发经纬度</a-checkbox>

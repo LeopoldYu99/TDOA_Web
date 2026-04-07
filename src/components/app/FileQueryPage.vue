@@ -13,7 +13,8 @@
 
     <div class="payload-filter-bar">
       <span class="payload-filter-title">载荷过滤：</span>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterCommTypeModel" /> 业务类型</label>
+      <!-- 这里保留“载荷过滤”的视觉分组，但其中也允许放与内容查询强相关的辅助过滤项。 -->
+      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterLocationLatLonModel" /> 定位经纬度</label>
       <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterSignalingModel" /> 信令类型</label>
       <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIdappXYZModel" /> 播发经纬度</label>
       <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterAircraftModel" /> ACARS</label>
@@ -130,7 +131,7 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  payloadFilterCommType: {
+  payloadFilterLocationLatLon: {
     type: Boolean,
     default: false,
   },
@@ -206,7 +207,7 @@ const emit = defineEmits([
   'update:fileQueryOnlyUl',
   'update:fileQueryOnlyImei',
   'update:fileQueryImeiFilter',
-  'update:payloadFilterCommType',
+  'update:payloadFilterLocationLatLon',
   'update:payloadFilterSignaling',
   'update:payloadFilterIdappXYZ',
   'update:payloadFilterAircraft',
@@ -250,9 +251,10 @@ const fileQueryImeiFilterModel = computed({
   set: value => emit('update:fileQueryImeiFilter', value),
 })
 
-const payloadFilterCommTypeModel = computed({
-  get: () => props.payloadFilterCommType,
-  set: value => emit('update:payloadFilterCommType', value),
+// 过滤项都通过 v-model 透传给父组件，页面组件只负责展示，不复制业务状态。
+const payloadFilterLocationLatLonModel = computed({
+  get: () => props.payloadFilterLocationLatLon,
+  set: value => emit('update:payloadFilterLocationLatLon', value),
 })
 
 const payloadFilterSignalingModel = computed({

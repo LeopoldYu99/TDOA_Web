@@ -10,7 +10,7 @@
         v-model:file-query-only-ul="fileQueryOnlyUl"
         v-model:file-query-only-imei="fileQueryOnlyImei"
         v-model:file-query-imei-filter="fileQueryImeiFilter"
-        v-model:payload-filter-comm-type="payloadFilterCommType"
+        v-model:payload-filter-location-lat-lon="payloadFilterLocationLatLon"
         v-model:payload-filter-signaling="payloadFilterSignaling"
         v-model:payload-filter-idapp-x-y-z="payloadFilterIdappXYZ"
         v-model:payload-filter-aircraft="payloadFilterAircraft"
@@ -225,8 +225,9 @@ const fileQueryOnlyImei = ref(true)
 const fileQueryOnlyLocation = ref(true)
 const fileQueryImeiFilter = ref('')
 
-// 载荷过滤
-const payloadFilterCommType = ref(false)
+// 内容查询额外过滤
+// payloadFilterLocationLatLon 用来筛出“拥有定位经纬度”的结果，和列筛选互补。
+const payloadFilterLocationLatLon = ref(false)
 const payloadFilterSignaling = ref(false)
 const payloadFilterIdappXYZ = ref(false)
 const payloadFilterAircraft = ref(false)
@@ -370,9 +371,12 @@ const fileQueryFilteredData = computed(() => {
       return selected.has(String(row[col.key] || ''))
     })) return false
 
+    // “定位经纬度”来自结果行本身，不依赖载荷解析结果。
+    // 这里只要 locationLatLon 有值，就认为该条记录拥有可展示的定位数据。
+    if (payloadFilterLocationLatLon.value && !String(row.locationLatLon || '').trim()) return false
+
     // 载荷过滤（勾选的条件必须全部满足）
     const d = row.payloadData || {}
-    if (payloadFilterCommType.value && !(d.commType?.length > 0)) return false
     if (payloadFilterSignaling.value && !(d.signaling?.length > 0)) return false
     if (payloadFilterIdappXYZ.value && !(d.idappXYZ?.length > 0)) return false
     if (payloadFilterAircraft.value && !(d.acars?.length > 0)) return false
@@ -1705,7 +1709,8 @@ function handleFileQueryReset() {
   fileQueryTableData.value = []
   fileQueryPage.value = 1
   fileQueryColumns.forEach(c => fileQueryFilters[c.key] = new Set())
-  payloadFilterCommType.value = false
+  // 重置时把所有前端勾选过滤恢复到默认态，避免切页后沿用旧条件。
+  payloadFilterLocationLatLon.value = false
   payloadFilterSignaling.value = false
   payloadFilterIdappXYZ.value = false
   payloadFilterAircraft.value = false

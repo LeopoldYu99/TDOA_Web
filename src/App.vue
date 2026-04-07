@@ -1,85 +1,100 @@
 <template>
-  <div class="layout">
-    <AppSidebar :menu-items="menuItems" v-model:active-menu="activeMenu" />
+  <a-layout class="app-layout">
+    <AppSidebar v-model:active-menu="activeMenu" />
 
-    <main class="main">
-      <FileQueryPage
-        v-if="activeMenu === 1"
-        v-model:file-query-start-time="fileQueryStartTime"
-        v-model:file-query-end-time="fileQueryEndTime"
-        v-model:file-query-only-ul="fileQueryOnlyUl"
-        v-model:file-query-only-imei="fileQueryOnlyImei"
-        v-model:file-query-imei-filter="fileQueryImeiFilter"
-        v-model:payload-filter-location-lat-lon="payloadFilterLocationLatLon"
-        v-model:payload-filter-signaling="payloadFilterSignaling"
-        v-model:payload-filter-idapp-x-y-z="payloadFilterIdappXYZ"
-        v-model:payload-filter-aircraft="payloadFilterAircraft"
-        v-model:payload-filter-voice="payloadFilterVoice"
-        v-model:payload-filter-sms="payloadFilterSms"
-        v-model:payload-filter-ip="payloadFilterIp"
-        v-model:payload-filter-low-speed="payloadFilterLowSpeed"
-        v-model:payload-filter-idapp="payloadFilterIdapp"
-        v-model:file-query-page="fileQueryPage"
-        :loading="loading"
-        :file-query-columns="fileQueryColumns"
-        :file-query-filters="fileQueryFilters"
-        :file-query-paged-data="fileQueryPagedData"
-        :file-query-filtered-data="fileQueryFilteredData"
-        :file-query-total-pages="fileQueryTotalPages"
-        :file-query-visible-pages="fileQueryVisiblePages"
-        @query="handleFileQuery"
-        @export="handleFileQueryExport"
-        @toggle-filter-dropdown="toggleFilterDropdown"
-        @open-payload-modal="openPayloadModal"
-        @open-location-preview="openLocationPreview"
-        @show-lcw-detail="showLCWDetail"
-        @export-lcw-detail="handleLCWDetailExport"
-      />
+    <a-layout>
+      <a-layout-header class="app-header">
+        <div class="header-left">
+          <a-breadcrumb>
+            <a-breadcrumb-item>{{ menuLabels[activeMenu] || '首页' }}</a-breadcrumb-item>
+          </a-breadcrumb>
+        </div>
+        <div class="header-right">
+          <a-button type="text" size="small" @click="toggleFullscreen">
+            <FullscreenOutlined />
+          </a-button>
+        </div>
+      </a-layout-header>
 
-      <MapPanel
-        v-show="activeMenu === 0 || activeMenu === 2"
-        :active-menu="activeMenu"
-        :loading="loading"
-        :countdown="countdown"
-        v-model:query-mode="queryMode"
-        v-model:cal-step-second="calStepSecond"
-        v-model:time-range="timeRange"
-        v-model:search-query-mode="searchQueryMode"
-        v-model:search-cal-step-second="searchCalStepSecond"
-        v-model:search-start-time="searchStartTime"
-        v-model:search-end-time="searchEndTime"
-        v-model:search-terminal-id="searchTerminalId"
-        @realtime-query="handleRealtimeQuery"
-        @search="handleSearch"
-        @export="handleExport"
-      />
+      <a-layout-content class="app-content">
+        <FileQueryPage
+          v-if="activeMenu === 1"
+          v-model:file-query-start-time="fileQueryStartTime"
+          v-model:file-query-end-time="fileQueryEndTime"
+          v-model:file-query-only-ul="fileQueryOnlyUl"
+          v-model:file-query-only-imei="fileQueryOnlyImei"
+          v-model:file-query-imei-filter="fileQueryImeiFilter"
+          v-model:payload-filter-location-lat-lon="payloadFilterLocationLatLon"
+          v-model:payload-filter-signaling="payloadFilterSignaling"
+          v-model:payload-filter-idapp-x-y-z="payloadFilterIdappXYZ"
+          v-model:payload-filter-aircraft="payloadFilterAircraft"
+          v-model:payload-filter-voice="payloadFilterVoice"
+          v-model:payload-filter-sms="payloadFilterSms"
+          v-model:payload-filter-ip="payloadFilterIp"
+          v-model:payload-filter-low-speed="payloadFilterLowSpeed"
+          v-model:payload-filter-idapp="payloadFilterIdapp"
+          v-model:file-query-page="fileQueryPage"
+          :loading="loading"
+          :file-query-columns="fileQueryColumns"
+          :file-query-filters="fileQueryFilters"
+          :file-query-paged-data="fileQueryPagedData"
+          :file-query-filtered-data="fileQueryFilteredData"
+          :file-query-total-pages="fileQueryTotalPages"
+          :file-query-visible-pages="fileQueryVisiblePages"
+          @query="handleFileQuery"
+          @export="handleFileQueryExport"
+          @toggle-filter-dropdown="toggleFilterDropdown"
+          @open-payload-modal="openPayloadModal"
+          @open-location-preview="openLocationPreview"
+          @show-lcw-detail="showLCWDetail"
+          @export-lcw-detail="handleLCWDetailExport"
+        />
 
-      <DeviceInfoPage
-        v-if="activeMenu === 3"
-        :device-config-form="deviceConfigForm"
-        :device-config-meta="deviceConfigMeta"
-        :device-config-loading="deviceConfigLoading"
-        :device-config-saving="deviceConfigSaving"
-        :rebooting-device="rebootingDevice"
-        :shutting-down-device="shuttingDownDevice"
-        :device-config-message="deviceConfigMessage"
-        :device-config-message-type="deviceConfigMessageType"
-        :device-list="deviceList"
-        @save-device-config="handleSaveDeviceConfig"
-        @reboot="handleReboot"
-        @shutdown="handleShutdown"
-        @open-mesh="openMeshPage"
-      />
+        <MapPanel
+          v-show="activeMenu === 0 || activeMenu === 2"
+          :active-menu="activeMenu"
+          :loading="loading"
+          :countdown="countdown"
+          v-model:query-mode="queryMode"
+          v-model:cal-step-second="calStepSecond"
+          v-model:time-range="timeRange"
+          v-model:search-query-mode="searchQueryMode"
+          v-model:search-cal-step-second="searchCalStepSecond"
+          v-model:search-start-time="searchStartTime"
+          v-model:search-end-time="searchEndTime"
+          v-model:search-terminal-id="searchTerminalId"
+          @realtime-query="handleRealtimeQuery"
+          @search="handleSearch"
+          @export="handleExport"
+        />
 
-      <CommEventsTable
-        v-if="activeMenu === 0"
-        :comm-table-data="commTableData"
-        @open-location-preview="openLocationPreview"
-        @open-payload-modal="openPayloadModal"
-        @show-lcw-detail="showLCWDetail"
-        @export-lcw-detail="handleLCWDetailExport"
-      />
-    </main>
+        <DeviceInfoPage
+          v-if="activeMenu === 3"
+          :device-config-form="deviceConfigForm"
+          :device-config-meta="deviceConfigMeta"
+          :device-config-loading="deviceConfigLoading"
+          :device-config-saving="deviceConfigSaving"
+          :rebooting-device="rebootingDevice"
+          :shutting-down-device="shuttingDownDevice"
+          :device-config-message="deviceConfigMessage"
+          :device-config-message-type="deviceConfigMessageType"
+          :device-list="deviceList"
+          @save-device-config="handleSaveDeviceConfig"
+          @reboot="handleReboot"
+          @shutdown="handleShutdown"
+          @open-mesh="openMeshPage"
+        />
+
+        <CommEventsTable
+          v-if="activeMenu === 0"
+          :comm-table-data="commTableData"
+          @open-location-preview="openLocationPreview"
+          @open-payload-modal="openPayloadModal"
+          @show-lcw-detail="showLCWDetail"
+          @export-lcw-detail="handleLCWDetailExport"
+        />
+      </a-layout-content>
+    </a-layout>
 
     <MapModal
       :visible="showTrajectoryModal"
@@ -102,7 +117,7 @@
       :lcw-detail-columns="lcwDetailColumns"
       :lcw-detail-filters="lcwDetailFilters"
       :lcw-detail-filtered-data="lcwDetailFilteredData"
-      @close="showLCWModal = false"
+      @close="closeLCWModal"
       @toggle-filter-dropdown="toggleLCWFilterDropdown"
     />
 
@@ -113,7 +128,7 @@
       @close="showPayloadModal = false"
       @download-wav="downloadWav"
     />
-  </div>
+  </a-layout>
 
   <ColumnFilterDropdown
     :visible="Boolean(activeFilterCol)"
@@ -144,6 +159,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { FullscreenOutlined } from '@ant-design/icons-vue'
 import AppSidebar from './components/app/AppSidebar.vue'
 import ColumnFilterDropdown from './components/app/ColumnFilterDropdown.vue'
 import CommEventsTable from './components/app/CommEventsTable.vue'
@@ -156,13 +172,7 @@ import PayloadModal from './components/app/PayloadModal.vue'
 
 // 侧栏菜单
 const activeMenu = ref(0)
-
-const menuItems = [
-  { label: '实时位置', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>' },
-  { label: '内容查询', icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/>' },
-  { label: '位置查询', icon: '<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.4 8 12 8 12s8-6.6 8-12a8 8 0 00-8-8z"/>' },
-  { label: '设备信息', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' },
-]
+const menuLabels = { 0: '实时位置', 1: '内容查询', 2: '位置查询', 3: '设备信息' }
 
 // 地图控件状态 - 实时位置
 const queryMode = ref('realtime')
@@ -881,6 +891,11 @@ function updateMapMarkers(data) {
   })
 
   // 不自动缩放地图，保留用户当前视角
+}
+
+function closeLCWModal() {
+  lcwDetailData.value = []
+  showLCWModal.value = false
 }
 
 // 查询LCW详情

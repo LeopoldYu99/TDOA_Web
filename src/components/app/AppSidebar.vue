@@ -1,9 +1,15 @@
 <template>
-  <aside class="sidebar">
-    <div class="logo">
-      <!-- logo 用内联 SVG，避免额外引入静态资源后还要处理打包路径。 -->
+  <a-layout-sider
+    :width="200"
+    :collapsed-width="64"
+    :collapsible="true"
+    v-model:collapsed="collapsed"
+    theme="dark"
+    class="app-sider"
+  >
+    <div class="sider-logo">
       <div class="logo-mark" aria-hidden="true">
-        <svg viewBox="0 0 64 64" fill="none">
+        <svg viewBox="0 0 64 64" fill="none" width="36" height="36">
           <defs>
             <linearGradient id="logoShell" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
               <stop offset="0" stop-color="#b8f4ff" />
@@ -41,38 +47,45 @@
           <circle cx="46.5" cy="17.5" r="6.2" stroke="#8fe7ff" opacity="0.28" />
         </svg>
       </div>
-      <span class="logo-text">信号识别定位系统</span>
+      <span v-if="!collapsed" class="logo-text">信号识别定位系统</span>
     </div>
 
-    <nav class="menu">
-      <div
-        v-for="(item, index) in menuItems"
-        :key="index"
-        class="menu-item"
-        :class="{ active: activeMenu === index }"
-        @click="emit('update:activeMenu', index)"
-      >
-        <svg
-          class="menu-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          v-html="item.icon"
-        ></svg>
-        <span>{{ item.label }}</span>
-      </div>
-    </nav>
-  </aside>
+    <a-menu
+      theme="dark"
+      mode="inline"
+      :selected-keys="[String(activeMenu)]"
+      @click="handleMenuClick"
+    >
+      <a-menu-item key="0">
+        <template #icon><AimOutlined /></template>
+        <span>实时位置</span>
+      </a-menu-item>
+      <a-menu-item key="1">
+        <template #icon><FileSearchOutlined /></template>
+        <span>内容查询</span>
+      </a-menu-item>
+      <a-menu-item key="2">
+        <template #icon><EnvironmentOutlined /></template>
+        <span>位置查询</span>
+      </a-menu-item>
+      <a-menu-item key="3">
+        <template #icon><SettingOutlined /></template>
+        <span>设备信息</span>
+      </a-menu-item>
+    </a-menu>
+  </a-layout-sider>
 </template>
 
 <script setup>
-// 侧栏本身没有业务状态，只接收当前激活项并把点击事件抛给父组件。
+import { ref } from 'vue'
+import {
+  AimOutlined,
+  FileSearchOutlined,
+  EnvironmentOutlined,
+  SettingOutlined,
+} from '@ant-design/icons-vue'
+
 defineProps({
-  menuItems: {
-    type: Array,
-    default: () => [],
-  },
   activeMenu: {
     type: Number,
     default: 0,
@@ -80,4 +93,35 @@ defineProps({
 })
 
 const emit = defineEmits(['update:activeMenu'])
+const collapsed = ref(false)
+
+function handleMenuClick({ key }) {
+  emit('update:activeMenu', Number(key))
+}
 </script>
+
+<style scoped>
+.app-sider {
+  background: linear-gradient(180deg, #001529 0%, #002140 100%) !important;
+}
+.app-sider :deep(.ant-layout-sider-children) {
+  display: flex;
+  flex-direction: column;
+}
+.sider-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.logo-text {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+</style>

@@ -1,81 +1,74 @@
 <template>
-  <div v-if="visible" class="trajectory-modal-overlay" @click.self="emit('close')">
-    <div class="trajectory-modal" style="width:90vw;height:80vh;">
-      <div class="trajectory-modal-header">
-        <span>LCW 详情</span>
-        <button class="trajectory-modal-close" @click="emit('close')">&times;</button>
-      </div>
-      <div class="trajectory-modal-body" style="overflow:auto;">
-        <div
-          v-if="loading"
-          class="loading-overlay"
-          style="position:relative;height:100%;display:flex;align-items:center;justify-content:center;"
-        >
-          <div class="loading-spinner"></div>
-          <span class="loading-text">加载中..</span>
-        </div>
-        <div v-else class="lcw-detail-wrapper">
-          <table class="device-table lcw-detail-table" style="width:100%;">
-            <thead>
-              <tr>
-                <th v-for="col in lcwDetailColumns" :key="col.key" class="filterable-th">
-                  <span>{{ col.label }}</span>
-                  <button
-                    class="filter-icon-btn"
-                    :class="{ 'filter-active': lcwDetailFilters[col.key]?.size > 0 }"
-                    @click.stop="emit('toggle-filter-dropdown', col.key, $event)"
-                  >
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                    </svg>
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in lcwDetailFilteredData" :key="i">
-                <td
-                  v-for="col in lcwDetailColumns"
-                  :key="col.key"
-                  :style="col.key === 'rawLine' ? 'text-align:left;word-break:break-all;' : ''"
-                >
-                  {{ row[col.key] }}
-                </td>
-              </tr>
-              <tr v-if="lcwDetailFilteredData.length === 0 && !loading">
-                <td :colspan="lcwDetailColumns.length" class="empty-row">暂无数据</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
+  <a-modal
+    :open="visible"
+    title="LCW 详情"
+    :footer="null"
+    :width="'90vw'"
+    :body-style="{ height: '70vh', overflow: 'auto', padding: '12px' }"
+    destroy-on-close
+    :animation="false"
+    :mask-animation="false"
+    @cancel="emit('close')"
+  >
+    <a-spin :spinning="loading" tip="加载中..">
+      <a-table
+        :columns="antColumns"
+        :data-source="lcwDetailFilteredData"
+        :pagination="{ pageSize: 100, size: 'small', showTotal: total => `共 ${total} 条`, showQuickJumper: true }"
+        size="small"
+        bordered
+        :scroll="{ y: 'calc(70vh - 120px)' }"
+      >
+        <template #headerCell="{ column }">
+          <span>{{ column.title }}</span>
+          <a-button
+            type="text"
+            size="small"
+            :class="{ 'filter-btn-active': lcwDetailFilters[column.key]?.size > 0 }"
+            @click.stop="emit('toggle-filter-dropdown', column.key, $event)"
+            style="padding: 0 4px; margin-left: 4px"
+          >
+            <FilterOutlined :style="{ fontSize: '11px', color: lcwDetailFilters[column.key]?.size > 0 ? '#1890ff' : '#bfbfbf' }" />
+          </a-button>
+        </template>
+        <template #bodyCell="{ column, text }">
+          <template v-if="column.key === 'rawLine'">
+            <span style="white-space: nowrap">{{ text }}</span>
+          </template>
+        </template>
+      </a-table>
+    </a-spin>
+  </a-modal>
 </template>
 
 <script setup>
-defineProps({
-  visible: {
-    type: Boolean,
-    default: false,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  lcwDetailColumns: {
-    type: Array,
-    default: () => [],
-  },
-  lcwDetailFilters: {
-    type: Object,
-    required: true,
-  },
-  lcwDetailFilteredData: {
-    type: Array,
-    default: () => [],
-  },
+import { computed } from 'vue'
+import { FilterOutlined } from '@ant-design/icons-vue'
+
+const props = defineProps({
+  visible: { type: Boolean, default: false },
+  loading: { type: Boolean, default: false },
+  lcwDetailColumns: { type: Array, default: () => [] },
+  lcwDetailFilters: { type: Object, required: true },
+  lcwDetailFilteredData: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['close', 'toggle-filter-dropdown'])
+
+const antColumns = computed(() =>
+  props.lcwDetailColumns.map(col => ({
+    title: col.label,
+    dataIndex: col.key,
+    key: col.key,
+    ellipsis: true,
+    width: col.key === 'rawLine' ? 400 : undefined,
+    align: 'center',
+  }))
+)
 </script>
+
+<style scoped>
+.filter-btn-active {
+  background: rgba(24, 144, 255, 0.1) !important;
+}
+</style>

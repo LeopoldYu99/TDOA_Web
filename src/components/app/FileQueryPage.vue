@@ -1,207 +1,140 @@
 <template>
-  <section class="file-query-page">
-    <div class="file-query-bar">
-      <input type="datetime-local" v-model="fileQueryStartTimeModel" class="datetime-input" step="1" />
-      <span class="datetime-arrow">→</span>
-      <input type="datetime-local" v-model="fileQueryEndTimeModel" class="datetime-input" step="1" />
-      <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyUlModel" /> 包含上行</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyImeiModel" /> 仅IMEI</label>
-      <input type="text" v-model="fileQueryImeiFilterModel" class="imei-filter-input" placeholder="IMEI过滤..." />
-      <button class="query-btn" @click="emit('query')">查 询</button>
-      <button class="export-btn" @click="emit('export')">导出</button>
-    </div>
-
-    <div class="payload-filter-bar">
-      <span class="payload-filter-title">载荷过滤：</span>
-      <!-- 这里保留“载荷过滤”的视觉分组，但其中也允许放与内容查询强相关的辅助过滤项。 -->
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterLocationLatLonModel" /> 定位经纬度</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterSignalingModel" /> 信令类型</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIdappXYZModel" /> 播发经纬度</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterAircraftModel" /> ACARS</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterVoiceModel" /> 语音通话</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterSmsModel" /> 短信数据</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIpModel" /> IP数据</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterLowSpeedModel" /> 低速数据</label>
-      <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIdappModel" /> 解析数据</label>
-    </div>
-
-    <div v-if="loading" class="loading-overlay static-loading">
-      <div class="loading-spinner"></div>
-      <span class="loading-text">数据加载中..</span>
-    </div>
-
-    <div class="file-query-table-wrapper">
-      <table class="device-table file-query-fixed-table">
-        <colgroup>
-          <col v-for="col in fileQueryColumns" :key="col.key" :style="{ width: col.width }" />
-          <col style="width:110px" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th v-for="col in fileQueryColumns" :key="col.key" class="filterable-th">
-              <span>{{ col.label }}</span>
-              <button
-                v-if="!col.noFilter"
-                class="filter-icon-btn"
-                :class="{ 'filter-active': fileQueryFilters[col.key]?.size > 0 }"
-                @click.stop="emit('toggle-filter-dropdown', col.key, $event)"
-              >
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                </svg>
-              </button>
-            </th>
-            <th>详情</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, i) in fileQueryPagedData" :key="i">
-            <td v-for="col in fileQueryColumns" :key="col.key">
-              <button
-                v-if="col.key === 'payloadInfo'"
-                class="payload-btn"
-                @click="emit('open-payload-modal', row)"
-              >
-                查看载荷
-              </button>
-              <template v-else-if="col.key === 'locationLatLon'">
-                <div class="latlon-cell">
-                  <span class="latlon-text">{{ row.locationLatLon || '-' }}</span>
-                  <button
-                    v-if="row.locationLatLon"
-                    class="location-view-btn"
-                    @click="emit('open-location-preview', row)"
-                  >
-                    查看
-                  </button>
-                </div>
-              </template>
-              <template v-else>{{ row[col.key] }}</template>
-            </td>
-            <td>
-              <div class="detail-actions">
-                <button class="detail-btn" @click="emit('show-lcw-detail', row)">查看</button>
-                <button class="detail-export-btn" @click="emit('export-lcw-detail', row)">导出</button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="fileQueryFilteredData.length === 0">
-            <td :colspan="fileQueryColumns.length + 1" class="empty-row">暂无数据</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-if="fileQueryFilteredData.length > 0" class="pagination">
-      <span class="page-info">共 {{ fileQueryFilteredData.length }} 条，第 {{ fileQueryPage }}/{{ fileQueryTotalPages }} 页</span>
-      <div class="page-btns">
-        <button class="page-btn" :disabled="fileQueryPage <= 1" @click="setPage(1)">首页</button>
-        <button class="page-btn" :disabled="fileQueryPage <= 1" @click="setPage(fileQueryPage - 1)">&lt;</button>
-        <template v-for="p in fileQueryVisiblePages" :key="p">
-          <button class="page-btn" :class="{ 'page-active': p === fileQueryPage }" @click="setPage(p)">{{ p }}</button>
-        </template>
-        <button class="page-btn" :disabled="fileQueryPage >= fileQueryTotalPages" @click="setPage(fileQueryPage + 1)">&gt;</button>
-        <button class="page-btn" :disabled="fileQueryPage >= fileQueryTotalPages" @click="setPage(fileQueryTotalPages)">末页</button>
+  <div class="file-query-page">
+    <a-card :bordered="false" size="small">
+      <div class="query-bar">
+        <input
+          type="datetime-local"
+          :value="fileQueryStartTime"
+          @input="emit('update:fileQueryStartTime', $event.target.value)"
+          class="native-datetime"
+          step="1"
+        />
+        <span style="color: #999; flex-shrink: 0">→</span>
+        <input
+          type="datetime-local"
+          :value="fileQueryEndTime"
+          @input="emit('update:fileQueryEndTime', $event.target.value)"
+          class="native-datetime"
+          step="1"
+        />
+        <a-checkbox :checked="fileQueryOnlyUl" @update:checked="v => emit('update:fileQueryOnlyUl', v)">包含上行</a-checkbox>
+        <a-checkbox :checked="fileQueryOnlyImei" @update:checked="v => emit('update:fileQueryOnlyImei', v)">仅IMEI</a-checkbox>
+        <a-input
+          :value="fileQueryImeiFilter"
+          @update:value="v => emit('update:fileQueryImeiFilter', v)"
+          placeholder="IMEI过滤..."
+          style="width: 150px"
+          size="small"
+          allow-clear
+        />
+        <a-button type="primary" size="small" @click="emit('query')">查 询</a-button>
+        <a-button size="small" @click="emit('export')">导出</a-button>
       </div>
+
+      <div class="payload-filter-bar">
+        <span style="font-weight: 500; color: #666; flex-shrink: 0">载荷过滤：</span>
+        <a-checkbox :checked="payloadFilterLocationLatLon" @update:checked="v => emit('update:payloadFilterLocationLatLon', v)">定位经纬度</a-checkbox>
+        <a-checkbox :checked="payloadFilterSignaling" @update:checked="v => emit('update:payloadFilterSignaling', v)">信令类型</a-checkbox>
+        <a-checkbox :checked="payloadFilterIdappXYZ" @update:checked="v => emit('update:payloadFilterIdappXYZ', v)">播发经纬度</a-checkbox>
+        <a-checkbox :checked="payloadFilterAircraft" @update:checked="v => emit('update:payloadFilterAircraft', v)">ACARS</a-checkbox>
+        <a-checkbox :checked="payloadFilterVoice" @update:checked="v => emit('update:payloadFilterVoice', v)">语音通话</a-checkbox>
+        <a-checkbox :checked="payloadFilterSms" @update:checked="v => emit('update:payloadFilterSms', v)">短信数据</a-checkbox>
+        <a-checkbox :checked="payloadFilterIp" @update:checked="v => emit('update:payloadFilterIp', v)">IP数据</a-checkbox>
+        <a-checkbox :checked="payloadFilterLowSpeed" @update:checked="v => emit('update:payloadFilterLowSpeed', v)">低速数据</a-checkbox>
+        <a-checkbox :checked="payloadFilterIdapp" @update:checked="v => emit('update:payloadFilterIdapp', v)">解析数据</a-checkbox>
+      </div>
+    </a-card>
+
+    <a-spin :spinning="loading" tip="数据加载中..">
+      <a-table
+        :columns="antColumns"
+        :data-source="fileQueryPagedData"
+        :pagination="false"
+        size="small"
+        :scroll="{ x: 'max-content' }"
+        bordered
+        row-key="chainID"
+        style="margin-top: 12px"
+      >
+        <template #headerCell="{ column }">
+          <span>{{ column.title }}</span>
+          <a-button
+            v-if="!column.noFilter"
+            type="text"
+            size="small"
+            :class="{ 'filter-btn-active': fileQueryFilters[column.key]?.size > 0 }"
+            @click.stop="emit('toggle-filter-dropdown', column.key, $event)"
+            style="padding: 0 4px; margin-left: 4px"
+          >
+            <FilterOutlined :style="{ fontSize: '11px', color: fileQueryFilters[column.key]?.size > 0 ? '#1890ff' : '#bfbfbf' }" />
+          </a-button>
+        </template>
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'payloadInfo'">
+            <a-button type="link" size="small" @click="emit('open-payload-modal', record)">查看载荷</a-button>
+          </template>
+          <template v-else-if="column.key === 'locationLatLon'">
+            <span>{{ record.locationLatLon || '-' }}</span>
+            <a-button
+              v-if="record.locationLatLon"
+              type="link"
+              size="small"
+              @click="emit('open-location-preview', record)"
+            >查看</a-button>
+          </template>
+          <template v-else-if="column.key === 'actions'">
+            <a-space>
+              <a-button type="link" size="small" @click="emit('show-lcw-detail', record)">查看</a-button>
+              <a-button type="link" size="small" @click="emit('export-lcw-detail', record)">导出</a-button>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+    </a-spin>
+
+    <div v-if="fileQueryFilteredData.length > 0" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center">
+      <span style="color: #666; font-size: 13px">
+        共 {{ fileQueryFilteredData.length }} 条，第 {{ fileQueryPage }}/{{ fileQueryTotalPages }} 页
+      </span>
+      <a-pagination
+        :current="fileQueryPage"
+        :total="fileQueryFilteredData.length"
+        :page-size="50"
+        size="small"
+        show-quick-jumper
+        @change="p => emit('update:fileQueryPage', p)"
+      />
     </div>
-  </section>
+  </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { FilterOutlined } from '@ant-design/icons-vue'
 
-// 这个组件只负责“内容查询页的展示”。
-// 真正的数据请求、过滤规则、分页计算都放在 App.vue 里，
-// 所以这里通过 props 接收数据，再通过 emit 把用户操作告诉父组件。
 const props = defineProps({
-  fileQueryStartTime: {
-    type: String,
-    default: '',
-  },
-  fileQueryEndTime: {
-    type: String,
-    default: '',
-  },
-  fileQueryOnlyUl: {
-    type: Boolean,
-    default: true,
-  },
-  fileQueryOnlyImei: {
-    type: Boolean,
-    default: true,
-  },
-  fileQueryImeiFilter: {
-    type: String,
-    default: '',
-  },
-  payloadFilterLocationLatLon: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterSignaling: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterIdappXYZ: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterAircraft: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterVoice: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterSms: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterIp: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterLowSpeed: {
-    type: Boolean,
-    default: false,
-  },
-  payloadFilterIdapp: {
-    type: Boolean,
-    default: false,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  fileQueryColumns: {
-    type: Array,
-    default: () => [],
-  },
-  fileQueryFilters: {
-    type: Object,
-    required: true,
-  },
-  fileQueryPagedData: {
-    type: Array,
-    default: () => [],
-  },
-  fileQueryFilteredData: {
-    type: Array,
-    default: () => [],
-  },
-  fileQueryPage: {
-    type: Number,
-    default: 1,
-  },
-  fileQueryTotalPages: {
-    type: Number,
-    default: 1,
-  },
-  fileQueryVisiblePages: {
-    type: Array,
-    default: () => [],
-  },
+  fileQueryStartTime: { type: String, default: '' },
+  fileQueryEndTime: { type: String, default: '' },
+  fileQueryOnlyUl: { type: Boolean, default: true },
+  fileQueryOnlyImei: { type: Boolean, default: true },
+  fileQueryImeiFilter: { type: String, default: '' },
+  payloadFilterLocationLatLon: { type: Boolean, default: false },
+  payloadFilterSignaling: { type: Boolean, default: false },
+  payloadFilterIdappXYZ: { type: Boolean, default: false },
+  payloadFilterAircraft: { type: Boolean, default: false },
+  payloadFilterVoice: { type: Boolean, default: false },
+  payloadFilterSms: { type: Boolean, default: false },
+  payloadFilterIp: { type: Boolean, default: false },
+  payloadFilterLowSpeed: { type: Boolean, default: false },
+  payloadFilterIdapp: { type: Boolean, default: false },
+  loading: { type: Boolean, default: false },
+  fileQueryColumns: { type: Array, default: () => [] },
+  fileQueryFilters: { type: Object, required: true },
+  fileQueryPagedData: { type: Array, default: () => [] },
+  fileQueryFilteredData: { type: Array, default: () => [] },
+  fileQueryPage: { type: Number, default: 1 },
+  fileQueryTotalPages: { type: Number, default: 1 },
+  fileQueryVisiblePages: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits([
@@ -229,81 +162,51 @@ const emit = defineEmits([
   'export-lcw-detail',
 ])
 
-// Vue 不允许直接修改 props，所以这里用 computed 包一层，
-// 把子组件里的 v-model 转成 “读 props / 发 update 事件” 的标准写法。
-const fileQueryStartTimeModel = computed({
-  get: () => props.fileQueryStartTime,
-  set: value => emit('update:fileQueryStartTime', value),
+const antColumns = computed(() => {
+  const cols = props.fileQueryColumns.map(col => ({
+    title: col.label,
+    dataIndex: col.key,
+    key: col.key,
+    width: parseInt(col.width) || 120,
+    noFilter: col.noFilter,
+    ellipsis: true,
+    align: 'center',
+  }))
+  cols.push({ title: '详情', key: 'actions', width: 120, noFilter: true, align: 'center' })
+  return cols
 })
-
-const fileQueryEndTimeModel = computed({
-  get: () => props.fileQueryEndTime,
-  set: value => emit('update:fileQueryEndTime', value),
-})
-
-const fileQueryOnlyUlModel = computed({
-  get: () => props.fileQueryOnlyUl,
-  set: value => emit('update:fileQueryOnlyUl', value),
-})
-
-const fileQueryOnlyImeiModel = computed({
-  get: () => props.fileQueryOnlyImei,
-  set: value => emit('update:fileQueryOnlyImei', value),
-})
-
-const fileQueryImeiFilterModel = computed({
-  get: () => props.fileQueryImeiFilter,
-  set: value => emit('update:fileQueryImeiFilter', value),
-})
-
-// 过滤项都通过 v-model 透传给父组件，页面组件只负责展示，不复制业务状态。
-const payloadFilterLocationLatLonModel = computed({
-  get: () => props.payloadFilterLocationLatLon,
-  set: value => emit('update:payloadFilterLocationLatLon', value),
-})
-
-const payloadFilterSignalingModel = computed({
-  get: () => props.payloadFilterSignaling,
-  set: value => emit('update:payloadFilterSignaling', value),
-})
-
-const payloadFilterIdappXYZModel = computed({
-  get: () => props.payloadFilterIdappXYZ,
-  set: value => emit('update:payloadFilterIdappXYZ', value),
-})
-
-const payloadFilterAircraftModel = computed({
-  get: () => props.payloadFilterAircraft,
-  set: value => emit('update:payloadFilterAircraft', value),
-})
-
-const payloadFilterVoiceModel = computed({
-  get: () => props.payloadFilterVoice,
-  set: value => emit('update:payloadFilterVoice', value),
-})
-
-const payloadFilterSmsModel = computed({
-  get: () => props.payloadFilterSms,
-  set: value => emit('update:payloadFilterSms', value),
-})
-
-const payloadFilterIpModel = computed({
-  get: () => props.payloadFilterIp,
-  set: value => emit('update:payloadFilterIp', value),
-})
-
-const payloadFilterLowSpeedModel = computed({
-  get: () => props.payloadFilterLowSpeed,
-  set: value => emit('update:payloadFilterLowSpeed', value),
-})
-
-const payloadFilterIdappModel = computed({
-  get: () => props.payloadFilterIdapp,
-  set: value => emit('update:payloadFilterIdapp', value),
-})
-
-function setPage(page) {
-  // 页码切换也统一交给父组件处理，这样分页展示和分页数据永远同步。
-  emit('update:fileQueryPage', page)
-}
 </script>
+
+<style scoped>
+.query-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.payload-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.native-datetime {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+  outline: none;
+  flex-shrink: 0;
+  width: 200px;
+}
+.native-datetime:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+.filter-btn-active {
+  background: rgba(24, 144, 255, 0.1) !important;
+}
+</style>

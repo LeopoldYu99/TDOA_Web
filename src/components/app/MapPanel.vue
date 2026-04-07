@@ -31,9 +31,12 @@
           <a-select-option value="24hour">24hour</a-select-option>
         </a-select>
         <a-button type="primary" size="small" @click="emit('realtime-query')">查 询</a-button>
-        <a-badge :count="countdown" :number-style="{ backgroundColor: '#1890ff' }" :overflow-count="999">
-          <span style="display:inline-block;width:8px"></span>
-        </a-badge>
+        <a-badge
+          class="countdown-badge-inline"
+          :count="countdown"
+          :overflow-count="999"
+          :number-style="countdownNumberStyle"
+        />
         <a-button size="small" @click="emit('export')">导 出</a-button>
       </div>
     </div>
@@ -143,6 +146,17 @@ const searchCalStepSecondModel = computed({
   get: () => props.searchCalStepSecond,
   set: value => emit('update:searchCalStepSecond', value),
 })
+
+const countdownNumberStyle = {
+  backgroundColor: '#1677ff',
+  minWidth: '18px',
+  height: '18px',
+  lineHeight: '18px',
+  padding: '0 4px',
+  fontSize: '10px',
+  fontWeight: 600,
+  boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.95)',
+}
 </script>
 
 <style scoped>
@@ -163,6 +177,15 @@ const searchCalStepSecondModel = computed({
   gap: 8px;
   white-space: nowrap;
   flex-wrap: nowrap;
+}
+.countdown-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-left: -2px;
+  margin-right: 2px;
+}
+:deep(.countdown-badge-inline .ant-badge-count) {
+  transform: translate(0, 0);
 }
 .map-controls {
   position: absolute;

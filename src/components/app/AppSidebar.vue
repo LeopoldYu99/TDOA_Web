@@ -1,6 +1,6 @@
 <template>
   <a-layout-sider
-    :width="200"
+    :width="184"
     :collapsed-width="64"
     :collapsible="true"
     v-model:collapsed="collapsed"

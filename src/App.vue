@@ -1,528 +1,161 @@
-﻿<template>
+<template>
   <div class="layout">
-    <!-- 左侧导航栏-->
-    <aside class="sidebar">
-      <div class="logo">
-        <span>信号识别定位系统</span>
-      </div>
+    <AppSidebar :menu-items="menuItems" v-model:active-menu="activeMenu" />
 
-      <nav class="menu">
-        <div
-          v-for="(item, index) in menuItems"
-          :key="index"
-          class="menu-item"
-          :class="{ active: activeMenu === index }"
-          @click="activeMenu = index"
-        >
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" v-html="item.icon"></svg>
-          <span>{{ item.label }}</span>
-        </div>
-      </nav>
-    </aside>
-
-    <!-- 主内容区 -->
     <main class="main">
-      <!-- 顶部工具栏已移除 -->
+      <FileQueryPage
+        v-if="activeMenu === 1"
+        v-model:file-query-start-time="fileQueryStartTime"
+        v-model:file-query-end-time="fileQueryEndTime"
+        v-model:file-query-only-ul="fileQueryOnlyUl"
+        v-model:file-query-only-imei="fileQueryOnlyImei"
+        v-model:file-query-imei-filter="fileQueryImeiFilter"
+        v-model:payload-filter-comm-type="payloadFilterCommType"
+        v-model:payload-filter-signaling="payloadFilterSignaling"
+        v-model:payload-filter-idapp-x-y-z="payloadFilterIdappXYZ"
+        v-model:payload-filter-aircraft="payloadFilterAircraft"
+        v-model:payload-filter-voice="payloadFilterVoice"
+        v-model:payload-filter-sms="payloadFilterSms"
+        v-model:payload-filter-ip="payloadFilterIp"
+        v-model:payload-filter-low-speed="payloadFilterLowSpeed"
+        v-model:payload-filter-idapp="payloadFilterIdapp"
+        v-model:file-query-page="fileQueryPage"
+        :loading="loading"
+        :file-query-columns="fileQueryColumns"
+        :file-query-filters="fileQueryFilters"
+        :file-query-paged-data="fileQueryPagedData"
+        :file-query-filtered-data="fileQueryFilteredData"
+        :file-query-total-pages="fileQueryTotalPages"
+        :file-query-visible-pages="fileQueryVisiblePages"
+        @query="handleFileQuery"
+        @export="handleFileQueryExport"
+        @toggle-filter-dropdown="toggleFilterDropdown"
+        @open-payload-modal="openPayloadModal"
+        @open-location-preview="openLocationPreview"
+        @show-lcw-detail="showLCWDetail"
+        @export-lcw-detail="handleLCWDetailExport"
+      />
 
-      <!-- 地图区域锛堣蒋浠舵帶鍒堕〉涓嶆樉绀哄湴鍥撅級 -->
-      <!-- 内容查询页-->
-      <section v-if="activeMenu === 1" class="file-query-page">
-        <div class="file-query-bar">
-          <input type="datetime-local" v-model="fileQueryStartTime" class="datetime-input" step="1" />
-          <span class="datetime-arrow">→</span>
-          <input type="datetime-local" v-model="fileQueryEndTime" class="datetime-input" step="1" />
-          <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyUl" /> 包含上行</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="fileQueryOnlyImei" /> 仅IMEI</label>
-          <input type="text" v-model="fileQueryImeiFilter" class="imei-filter-input" placeholder="IMEI过滤..." />
-          <button class="query-btn" @click="handleFileQuery">查 询</button>
-          <button class="export-btn" @click="handleFileQueryExport">导出</button>
-        </div>
-        <div class="payload-filter-bar">
-          <span class="payload-filter-title">载荷过滤：</span>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterCommType" /> 业务类型</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterSignaling" /> 信令类型</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIdappXYZ" /> 播发经纬度</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterAircraft" /> ACARS</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterVoice" /> 语音通话</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterSms" /> 短信数据</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIp" /> IP数据</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterLowSpeed" /> 低速数据</label>
-          <label class="checkbox-label"><input type="checkbox" v-model="payloadFilterIdapp" /> 解析数据</label>
-        </div>
-        <div v-if="loading" class="loading-overlay static-loading">
-          <div class="loading-spinner"></div>
-          <span class="loading-text">数据加载中..</span>
-        </div>
-        <div class="file-query-table-wrapper">
-          <table class="device-table file-query-fixed-table">
-            <colgroup>
-              <col v-for="col in fileQueryColumns" :key="col.key" :style="{ width: col.width }" />
-              <col style="width:110px" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th v-for="col in fileQueryColumns" :key="col.key" class="filterable-th">
-                  <span>{{ col.label }}</span>
-                  <button
-                    v-if="!col.noFilter"
-                    class="filter-icon-btn"
-                    :class="{ 'filter-active': fileQueryFilters[col.key]?.size > 0 }"
-                    @click.stop="toggleFilterDropdown(col.key, $event)"
-                  >
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                    </svg>
-                  </button>
-                </th>
-                <th>详情</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in fileQueryPagedData" :key="i">
-                <td v-for="col in fileQueryColumns" :key="col.key">
-                  <button v-if="col.key === 'payloadInfo'" class="payload-btn" @click="openPayloadModal(row)">查看载荷</button>
-                  <template v-else-if="col.key === 'locationLatLon'">
-                    <div class="latlon-cell">
-                      <span class="latlon-text">{{ row.locationLatLon || '-' }}</span>
-                      <button v-if="row.locationLatLon" class="location-view-btn" @click="openLocationPreview(row)">查看</button>
-                    </div>
-                  </template>
-                  <template v-else>{{ row[col.key] }}</template>
-                </td>
-                <td>
-                  <div class="detail-actions">
-                    <button class="detail-btn" @click="showLCWDetail(row)">查看</button>
-                    <button class="detail-export-btn" @click="handleLCWDetailExport(row)">导出</button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="fileQueryFilteredData.length === 0">
-                <td :colspan="fileQueryColumns.length + 1" class="empty-row">暂无数据</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <!-- 分页 -->
-        <div v-if="fileQueryFilteredData.length > 0" class="pagination">
-          <span class="page-info">共 {{ fileQueryFilteredData.length }} 条，第 {{ fileQueryPage }}/{{ fileQueryTotalPages }} 页</span>
-          <div class="page-btns">
-            <button class="page-btn" :disabled="fileQueryPage <= 1" @click="fileQueryPage = 1">首页</button>
-            <button class="page-btn" :disabled="fileQueryPage <= 1" @click="fileQueryPage--">&lt;</button>
-            <template v-for="p in fileQueryVisiblePages" :key="p">
-              <button class="page-btn" :class="{ 'page-active': p === fileQueryPage }" @click="fileQueryPage = p">{{ p }}</button>
-            </template>
-            <button class="page-btn" :disabled="fileQueryPage >= fileQueryTotalPages" @click="fileQueryPage++">&gt;</button>
-            <button class="page-btn" :disabled="fileQueryPage >= fileQueryTotalPages" @click="fileQueryPage = fileQueryTotalPages">末页</button>
-          </div>
-        </div>
-      </section>
+      <MapPanel
+        v-show="activeMenu === 0 || activeMenu === 2"
+        :active-menu="activeMenu"
+        :loading="loading"
+        :countdown="countdown"
+        v-model:query-mode="queryMode"
+        v-model:cal-step-second="calStepSecond"
+        v-model:time-range="timeRange"
+        v-model:search-query-mode="searchQueryMode"
+        v-model:search-cal-step-second="searchCalStepSecond"
+        v-model:search-start-time="searchStartTime"
+        v-model:search-end-time="searchEndTime"
+        v-model:search-terminal-id="searchTerminalId"
+        @realtime-query="handleRealtimeQuery"
+        @search="handleSearch"
+        @export="handleExport"
+      />
 
-      <section v-show="activeMenu === 0 || activeMenu === 2" class="map-container">
-        <div id="map" ref="mapRef"></div>
-        <!-- 实时位置 - 地图右上角控件-->
-        <div v-if="activeMenu === 0" class="map-controls">
-          <select v-model="queryMode" class="map-select">
-            <option value="realtime">实时模式</option>
-            <option value="highprecision">高精度模式</option>
-          </select>
-          <select v-model="calStepSecond" class="map-select" :disabled="queryMode === 'realtime'" :title="queryMode === 'realtime' ? '实时定位模式无效' : 'CalStepSecond'">
-            <option value="30">30s</option>
-            <option value="60">1min</option>
-            <option value="120">2min</option>
-            <option value="300">5min</option>
-            <option value="600">10min</option>
-            <option value="1800">30min</option>
-            <option value="3600">60min</option>
-          </select>
-          <select v-model="timeRange" class="map-select">
-            <option value="1hour">1hour</option>
-            <option value="2hour">2hour</option>
-            <option value="6hour">6hour</option>
-            <option value="12hour">12hour</option>
-            <option value="24hour">24hour</option>
-          </select>
-          <button class="query-btn" @click="handleRealtimeQuery">查 询</button>
-          <span class="countdown-badge">{{ countdown }}s</span>
-          <button class="export-btn" @click="handleExport">导 出</button>
-        </div>
-        <!-- 加载遮罩 -->
-        <div v-if="loading" class="loading-overlay">
-          <div class="loading-spinner"></div>
-          <span class="loading-text">数据加载中..</span>
-        </div>
-        <!-- 位置展示 - 鍦板浘椤堕儴查询鏍?-->
-        <div v-if="activeMenu === 2" class="map-controls-bar">
-          <select v-model="searchQueryMode" class="map-select">
-            <option value="realtime">实时模式</option>
-            <option value="highprecision">高精度模式</option>
-          </select>
-          <select v-model="searchCalStepSecond" class="map-select" :disabled="searchQueryMode === 'realtime'" :title="searchQueryMode === 'realtime' ? '实时定位模式无效' : 'CalStepSecond'">
-            <option value="30">30s</option>
-            <option value="60">1min</option>
-            <option value="120">2min</option>
-            <option value="300">5min</option>
-            <option value="600">10min</option>
-            <option value="1800">30min</option>
-            <option value="3600">60min</option>
-          </select>
-          <input type="datetime-local" v-model="searchStartTime" class="datetime-input" step="1" />
-          <span class="datetime-arrow">→</span>
-          <input type="datetime-local" v-model="searchEndTime" class="datetime-input" step="1" />
-          <input type="text" v-model="searchTerminalId" class="terminal-input" placeholder="请输入终端ID" />
-          <button class="query-btn" @click="handleSearch">查询</button>
-          <button class="export-btn" @click="handleExport">导出</button>
-        </div>
-      </section>
+      <DeviceInfoPage
+        v-if="activeMenu === 3"
+        :device-config-form="deviceConfigForm"
+        :device-config-meta="deviceConfigMeta"
+        :device-config-loading="deviceConfigLoading"
+        :device-config-saving="deviceConfigSaving"
+        :rebooting-device="rebootingDevice"
+        :shutting-down-device="shuttingDownDevice"
+        :device-config-message="deviceConfigMessage"
+        :device-config-message-type="deviceConfigMessageType"
+        :device-list="deviceList"
+        @save-device-config="handleSaveDeviceConfig"
+        @reboot="handleReboot"
+        @shutdown="handleShutdown"
+        @open-mesh="openMeshPage"
+      />
 
-      <!-- 软件控制 - 设备信息页-->
-      <section v-if="activeMenu === 3" class="device-page">
-        <div class="device-section device-config-section">
-          <div class="device-section-header">
-            <div>
-              <div class="device-section-title">设备配置</div>
-            </div>
-            <div class="device-config-toolbar">
-              <button class="query-btn" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice" @click="handleSaveDeviceConfig">
-                {{ deviceConfigSaving ? '保存中...' : '保存配置' }}
-              </button>
-              <button class="danger-btn" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice" @click="handleReboot">
-                {{ rebootingDevice ? '重启中...' : '设备重启' }}
-              </button>
-              <button class="danger-btn danger-btn-secondary" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice || shuttingDownDevice" @click="handleShutdown">
-                {{ shuttingDownDevice ? '关机中...' : '设备关机' }}
-              </button>
-            </div>
-          </div>
-
-          <div
-            v-if="deviceConfigMessage"
-            class="device-config-message"
-            :class="`device-config-message-${deviceConfigMessageType}`"
-          >
-            {{ deviceConfigMessage }}
-          </div>
-
-          <div class="device-config-grid">
-            <div class="device-config-field">
-              <span class="device-config-label">设备编号</span>
-              <input class="device-config-input" :value="deviceConfigMeta.deviceGuid || '-'" type="text" readonly />
-            </div>
-
-            <label class="device-config-field">
-              <span class="device-config-label">是否是中心节点</span>
-              <div class="device-switch-row">
-                <label class="device-switch">
-                  <input v-model="deviceConfigForm.isCenterNode" type="checkbox" :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice" />
-                  <span class="device-switch-slider"></span>
-                </label>
-                <span class="device-switch-text">{{ deviceConfigForm.isCenterNode ? '是' : '否' }}</span>
-              </div>
-            </label>
-
-            <div class="device-config-field">
-              <span class="device-config-label">主节点 IP</span>
-              <input
-                v-model.trim="deviceConfigForm.device1IP"
-                class="device-config-input"
-                type="text"
-                placeholder="对应 Device1IP"
-                :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice"
-              />
-            </div>
-
-            <div class="device-config-field">
-              <span class="device-config-label">从节点2 IP</span>
-              <input
-                v-model.trim="deviceConfigForm.device2IP"
-                class="device-config-input"
-                type="text"
-                placeholder="对应 Device2IP"
-                :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice"
-              />
-            </div>
-
-            <div class="device-config-field">
-              <span class="device-config-label">从节点3 IP</span>
-              <input
-                v-model.trim="deviceConfigForm.device3IP"
-                class="device-config-input"
-                type="text"
-                placeholder="对应 Device3IP"
-                :disabled="deviceConfigLoading || deviceConfigSaving || rebootingDevice"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div class="device-section device-card-section">
-          <div class="device-section-header">
-            <div>
-              <div class="device-section-title">设备运行信息</div>
-              <div class="device-section-desc">展示当前三台设备的在线状态、资源占用与自组网入口。</div>
-            </div>
-          </div>
-          <div class="device-table-wrapper">
-            <table class="device-table">
-              <thead>
-                <tr>
-                  <th>设备名称</th>
-                  <th>更新时间</th>
-                  <th>已工作时间</th>
-                  <th>磁盘已用/总量(GB)</th>
-                  <th>磁盘剩余(GB)</th>
-                  <th>CPU使用率(%)</th>
-                  <th>自组网</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(dev, i) in deviceList" :key="i">
-                  <td><span class="status-light" :class="dev.isOnline ? 'online' : 'offline'"></span>{{ dev.name }}</td>
-                  <td>{{ dev.lastWorkedTime }}</td>
-                  <td>{{ dev.workedTime }}</td>
-                  <td>{{ dev.diskUsedGB }} / {{ dev.diskTotalGB }}</td>
-                  <td>{{ dev.diskAvailGB }}</td>
-                  <td :class="{ 'cpu-high': dev.cpuUsagePercent > 80 }">{{ dev.cpuUsagePercent }}</td>
-                  <td><button class="mesh-btn" @click="openMeshPage(i + 1)">前往自组网</button></td>
-                </tr>
-                <tr v-if="deviceList.length === 0">
-                  <td colspan="7" class="empty-row">暂无数据</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- 底部通信事件表格锛堜粎实时位置椤垫樉绀猴級 -->
-      <section v-if="activeMenu === 0" class="table-panel">
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>设备号</th>
-                <th>识别码</th>
-                <th>通信起始时间</th>
-                <th>通信截止时间</th>
-                <th>通信时长(秒)</th>
-                <th>IMEI</th>
-                <th>定位经纬度</th>
-                <th>载荷信息</th>
-                <th>详情</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in commTableData" :key="i">
-                <td>{{ row.deviceNumber }}</td>
-                <td>{{ row.chainID }}</td>
-                <td>{{ row.startTime }}</td>
-                <td>{{ row.endTime }}</td>
-                <td>{{ row.duration }}</td>
-                <td>{{ row.imei }}</td>
-                <td>
-                  <div class="latlon-cell">
-                    <span class="latlon-text">{{ row.locationLatLon || '-' }}</span>
-                    <button v-if="row.locationLatLon" class="location-view-btn" @click="openLocationPreview(row)">查看</button>
-                  </div>
-                </td>
-                <td><button class="payload-btn" @click="openPayloadModal(row)">查看载荷</button></td>
-                <td>
-                  <div class="detail-actions">
-                    <button class="detail-btn" @click="showLCWDetail(row)">查看</button>
-                    <button class="detail-export-btn" @click="handleLCWDetailExport(row)">导出</button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="commTableData.length === 0">
-                <td colspan="9" class="empty-row">暂无数据</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <CommEventsTable
+        v-if="activeMenu === 0"
+        :comm-table-data="commTableData"
+        @open-location-preview="openLocationPreview"
+        @open-payload-modal="openPayloadModal"
+        @show-lcw-detail="showLCWDetail"
+        @export-lcw-detail="handleLCWDetailExport"
+      />
     </main>
 
-    <!-- 轨迹弹窗 -->
-    <div v-if="showTrajectoryModal" class="trajectory-modal-overlay" @click.self="closeTrajectoryModal">
-      <div class="trajectory-modal">
-        <div class="trajectory-modal-header">
-          <span>终端轨迹 - {{ trajectoryTerminalId }}  {{ trajectoryTimeRange }}</span>
-          <button class="trajectory-modal-close" @click="closeTrajectoryModal">&times;</button>
-        </div>
-        <div class="trajectory-modal-body">
-          <div id="trajectoryMap" style="width:100%;height:100%;"></div>
-        </div>
-      </div>
-    </div>
+    <MapModal
+      :visible="showTrajectoryModal"
+      :title="`终端轨迹 - ${trajectoryTerminalId}  ${trajectoryTimeRange}`"
+      map-id="trajectoryMap"
+      @close="closeTrajectoryModal"
+    />
 
-    <!-- 定位预览弹窗 -->
-    <div v-if="showLocationModal" class="trajectory-modal-overlay" @click.self="closeLocationPreview">
-      <div class="trajectory-modal location-preview-modal">
-        <div class="trajectory-modal-header">
-          <span>定位预览 - {{ locationPreviewLatLon }}</span>
-          <button class="trajectory-modal-close" @click="closeLocationPreview">&times;</button>
-        </div>
-        <div class="trajectory-modal-body">
-          <div id="locationPreviewMap" style="width:100%;height:100%;"></div>
-        </div>
-      </div>
-    </div>
+    <MapModal
+      :visible="showLocationModal"
+      :title="`定位预览 - ${locationPreviewLatLon}`"
+      map-id="locationPreviewMap"
+      modal-class="location-preview-modal"
+      @close="closeLocationPreview"
+    />
 
-    <!-- LCW详情弹窗 -->
-    <div v-if="showLCWModal" class="trajectory-modal-overlay" @click.self="showLCWModal = false">
-      <div class="trajectory-modal" style="width:90vw;height:80vh;">
-        <div class="trajectory-modal-header">
-          <span>LCW 详情</span>
-          <button class="trajectory-modal-close" @click="showLCWModal = false">&times;</button>
-        </div>
-        <div class="trajectory-modal-body" style="overflow:auto;">
-          <div v-if="lcwLoading" class="loading-overlay" style="position:relative;height:100%;display:flex;align-items:center;justify-content:center;">
-            <div class="loading-spinner"></div>
-            <span class="loading-text">加载中..</span>
-          </div>
-          <div v-else class="lcw-detail-wrapper">
-            <table class="device-table lcw-detail-table" style="width:100%;">
-              <thead>
-                <tr>
-                  <th v-for="col in lcwDetailColumns" :key="col.key" class="filterable-th">
-                    <span>{{ col.label }}</span>
-                    <button
-                      class="filter-icon-btn"
-                      :class="{ 'filter-active': lcwDetailFilters[col.key]?.size > 0 }"
-                      @click.stop="toggleLCWFilterDropdown(col.key, $event)"
-                    >
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                      </svg>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, i) in lcwDetailFilteredData" :key="i">
-                  <td
-                    v-for="col in lcwDetailColumns"
-                    :key="col.key"
-                    :style="col.key === 'rawLine' ? 'text-align:left;word-break:break-all;' : ''"
-                  >
-                    {{ row[col.key] }}
-                  </td>
-                </tr>
-                <tr v-if="lcwDetailFilteredData.length === 0 && !lcwLoading">
-                  <td :colspan="lcwDetailColumns.length" class="empty-row">暂无数据</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- 载荷信息弹窗 -->
-    <div v-if="showPayloadModal" class="trajectory-modal-overlay" @click.self="showPayloadModal = false">
-      <div class="payload-modal">
-        <div class="trajectory-modal-header">
-          <span>载荷信息</span>
-          <button class="trajectory-modal-close" @click="showPayloadModal = false">&times;</button>
-        </div>
-        <div class="payload-modal-body">
-          <div v-for="section in currentPayloadSections" :key="section.label" class="payload-section">
-            <div class="payload-section-label" :style="{ color: section.color }">{{ section.label }}</div>
-            <div class="payload-tags">
-              <!-- 璇煶閫氳瘽锛氭瘡鏉℃樉绀轰笅杞芥寜閽?-->
-              <template v-if="section.type === 'wav'">
-                <button
-                  v-for="(val, vi) in section.values"
-                  :key="vi"
-                  class="wav-download-btn"
-                  @click="downloadWav(val, currentPayloadData.chainID, vi)"
-                >
-                  <span class="wav-icon">&#9654;</span> 语音{{ vi + 1 }}.wav
-                </button>
-              </template>
-              <!-- 鏂囨湰类型锛氬琛屽睍绀?-->
-              <template v-else-if="section.type === 'text'">
-                <div class="payload-text-block">
-                  <span v-for="(line, li) in section.text.split('\n')" :key="li" class="payload-text-line">{{ line }}</span>
-                </div>
-              </template>
-              <!-- 鏍囩类型 -->
-              <template v-else>
-                <span v-for="(val, vi) in section.values" :key="vi" class="payload-tag" :style="{ borderColor: section.color, color: section.color }">{{ val }}</span>
-              </template>
-            </div>
-          </div>
-          <div v-if="currentPayloadSections.length === 0" class="empty-row" style="padding:24px 0;">暂无载荷数据</div>
-        </div>
-      </div>
-    </div>
+    <LcwDetailModal
+      :visible="showLCWModal"
+      :loading="lcwLoading"
+      :lcw-detail-columns="lcwDetailColumns"
+      :lcw-detail-filters="lcwDetailFilters"
+      :lcw-detail-filtered-data="lcwDetailFilteredData"
+      @close="showLCWModal = false"
+      @toggle-filter-dropdown="toggleLCWFilterDropdown"
+    />
+
+    <PayloadModal
+      :visible="showPayloadModal"
+      :current-payload-data="currentPayloadData"
+      :current-payload-sections="currentPayloadSections"
+      @close="showPayloadModal = false"
+      @download-wav="downloadWav"
+    />
   </div>
 
-  <!-- 列筛选変笅鎷夛紙Teleport 鍒?body锛宖ixed 瀹氫綅锛屼笉琚?overflow 瑁佸壀锛?-->
-  <Teleport to="body">
-    <div
-      v-if="activeFilterCol"
-      class="filter-dropdown"
-      :style="{ top: filterDropdownPos.top + 'px', left: filterDropdownPos.left + 'px' }"
-      @click.stop
-    >
-      <input type="text" class="filter-search" v-model="filterSearchText" placeholder="搜索..." />
-      <div class="filter-actions">
-        <button @click="filterSelectAll(activeFilterCol)">全选</button>
-        <button @click="filterClearAll(activeFilterCol)">清除</button>
-      </div>
-      <div class="filter-options">
-        <label
-          v-for="val in getFilteredOptions(activeFilterCol)"
-          :key="val"
-          class="filter-option"
-        >
-          <input type="checkbox" :checked="fileQueryFilters[activeFilterCol]?.has(val)" @change="toggleFilterValue(activeFilterCol, val)" />
-          <span>{{ val || '(空)' }}</span>
-        </label>
-        <div v-if="getFilteredOptions(activeFilterCol).length === 0" class="filter-empty">无匹配项</div>
-      </div>
-      <div class="filter-footer">
-        <button class="filter-confirm" @click="activeFilterCol = null">确定</button>
-      </div>
-    </div>
-  </Teleport>
-  <Teleport to="body">
-    <div
-      v-if="lcwActiveFilterCol"
-      class="filter-dropdown"
-      :style="{ top: lcwFilterDropdownPos.top + 'px', left: lcwFilterDropdownPos.left + 'px' }"
-      @click.stop
-    >
-      <input type="text" class="filter-search" v-model="lcwFilterSearchText" placeholder="搜索..." />
-      <div class="filter-actions">
-        <button @click="lcwFilterSelectAll(lcwActiveFilterCol)">全选</button>
-        <button @click="lcwFilterClearAll(lcwActiveFilterCol)">清除</button>
-      </div>
-      <div class="filter-options">
-        <label
-          v-for="val in getLCWFilteredOptions(lcwActiveFilterCol)"
-          :key="val"
-          class="filter-option"
-        >
-          <input type="checkbox" :checked="lcwDetailFilters[lcwActiveFilterCol]?.has(val)" @change="toggleLCWFilterValue(lcwActiveFilterCol, val)" />
-          <span>{{ val || '(空)' }}</span>
-        </label>
-        <div v-if="getLCWFilteredOptions(lcwActiveFilterCol).length === 0" class="filter-empty">无匹配项</div>
-      </div>
-      <div class="filter-footer">
-        <button class="filter-confirm" @click="lcwActiveFilterCol = null">确定</button>
-      </div>
-    </div>
-  </Teleport>
+  <ColumnFilterDropdown
+    :visible="Boolean(activeFilterCol)"
+    :position="filterDropdownPos"
+    :options="activeFilterCol ? getFilteredOptions(activeFilterCol) : []"
+    :selected-values="activeFilterCol ? fileQueryFilters[activeFilterCol] : null"
+    v-model:search-text="filterSearchText"
+    @select-all="activeFilterCol && filterSelectAll(activeFilterCol)"
+    @clear-all="activeFilterCol && filterClearAll(activeFilterCol)"
+    @toggle-value="val => activeFilterCol && toggleFilterValue(activeFilterCol, val)"
+    @close="activeFilterCol = null"
+  />
+
+  <ColumnFilterDropdown
+    :visible="Boolean(lcwActiveFilterCol)"
+    :position="lcwFilterDropdownPos"
+    :options="lcwActiveFilterCol ? getLCWFilteredOptions(lcwActiveFilterCol) : []"
+    :selected-values="lcwActiveFilterCol ? lcwDetailFilters[lcwActiveFilterCol] : null"
+    v-model:search-text="lcwFilterSearchText"
+    @select-all="lcwActiveFilterCol && lcwFilterSelectAll(lcwActiveFilterCol)"
+    @clear-all="lcwActiveFilterCol && lcwFilterClearAll(lcwActiveFilterCol)"
+    @toggle-value="val => lcwActiveFilterCol && toggleLCWFilterValue(lcwActiveFilterCol, val)"
+    @close="lcwActiveFilterCol = null"
+  />
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import AppSidebar from './components/app/AppSidebar.vue'
+import ColumnFilterDropdown from './components/app/ColumnFilterDropdown.vue'
+import CommEventsTable from './components/app/CommEventsTable.vue'
+import DeviceInfoPage from './components/app/DeviceInfoPage.vue'
+import FileQueryPage from './components/app/FileQueryPage.vue'
+import LcwDetailModal from './components/app/LcwDetailModal.vue'
+import MapModal from './components/app/MapModal.vue'
+import MapPanel from './components/app/MapPanel.vue'
+import PayloadModal from './components/app/PayloadModal.vue'
 
 // 侧栏菜单
 const activeMenu = ref(0)
-const sidebarCollapsed = ref(false)
 
 const menuItems = [
   { label: '实时位置', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>' },
@@ -531,11 +164,10 @@ const menuItems = [
   { label: '设备信息', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' },
 ]
 
-// 鍦板浘鎺т欢鐘舵€?- 实时位置
+// 地图控件状态 - 实时位置
 const queryMode = ref('realtime')
 const calStepSecond = ref('60')
 const timeRange = ref('2hour')
-const refreshInterval = ref('10min')
 
 // 位置展示查询参数
 const searchQueryMode = ref('realtime')
@@ -593,7 +225,7 @@ const fileQueryOnlyImei = ref(true)
 const fileQueryOnlyLocation = ref(true)
 const fileQueryImeiFilter = ref('')
 
-// 载荷杩囨护
+// 载荷过滤
 const payloadFilterCommType = ref(false)
 const payloadFilterSignaling = ref(false)
 const payloadFilterIdappXYZ = ref(false)
@@ -633,7 +265,7 @@ function getColumnUniqueValues(key) {
   return [...vals].sort()
 }
 
-// 鑾峰彇绛涢€夋悳绱㈠悗鐨勯€夐」
+// 获取筛选搜索后的选项
 function getFilteredOptions(key) {
   const all = getColumnUniqueValues(key)
   if (!filterSearchText.value) return all
@@ -647,7 +279,7 @@ function toggleFilterDropdown(key, event) {
   } else {
     activeFilterCol.value = key
     filterSearchText.value = ''
-    // 鐢ㄦ寜閽潗鏍囧畾浣嶏紝閬垮厤琚?overflow:auto 瑁佸壀
+    // 用按钮坐标定位，避免被 overflow:auto 裁剪
     if (event?.currentTarget) {
       const rect = event.currentTarget.getBoundingClientRect()
       filterDropdownPos.value = {
@@ -730,7 +362,7 @@ const fileQueryFilteredData = computed(() => {
       if (!String(row.imei || '').toLowerCase().includes(kw)) return false
     }
 
-    // 列筛选夛紙noFilter 鍒楄烦杩囷級
+    // 列筛选（跳过 noFilter 列）
     if (!fileQueryColumns.every(col => {
       if (col.noFilter) return true
       const selected = fileQueryFilters[col.key]
@@ -825,7 +457,6 @@ function formatDateTimeLocal(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-const mapRef = ref(null)
 let map = null
 let markers = [] // 存储地图上的标记
 let refreshTimer = null
@@ -835,13 +466,6 @@ const timeRangeHours = {
   '1hour': 1, '2hour': 2, '6hour': 6, '12hour': 12, '24hour': 24
 }
 
-// 刷新间隔映射锛堟绉掞級
-const refreshIntervalMs = {
-  '5min': 5 * 60 * 1000,
-  '10min': 10 * 60 * 1000,
-  '30min': 30 * 60 * 1000,
-  '60min': 60 * 60 * 1000
-}
 
 // 格式化栨棩鏈熶负 API 闇€瑕佺殑鏍煎紡
 function formatDateTime(date) {
@@ -849,17 +473,17 @@ function formatDateTime(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-// 格式化日期用于表格显示// 格式化.NET TimeSpan 字符串// "739699.14:51:03.8393552" 鈫?"739699澶?14:51:03"
-// "00:00:12.1426503"        鈫?"00:00:12"
+// 格式化 .NET TimeSpan 字符串用于表格显示
+// 示例: "739699.14:51:03.8393552" -> "739699天 14:51:03", "00:00:12.1426503" -> "00:00:12"
 function formatWorkedTime(val) {
   if (!val) return ''
-  // 判断是否有天数前缀€锛氬舰濡?"数字.数字:数字:数字"
+  // 判断是否有天数前缀，例如 "739699.14:51:03"
   const withDays = /^(\d+)\.(\d+):(\d+):(\d+)/.exec(val)
   if (withDays) {
     const [, d, hh, mm, ss] = withDays
     return `${d}天 ${hh.padStart(2,'0')}:${mm.padStart(2,'0')}:${ss.padStart(2,'0')}`
   }
-  // 不含天数锛氬舰濡?"HH:mm:ss.fff"
+  // 不含天数时，例如 "HH:mm:ss.fff"
   const nodays = /^(\d+):(\d+):(\d+)/.exec(val)
   if (nodays) {
     const [, hh, mm, ss] = nodays
@@ -997,14 +621,14 @@ function calcDuration(start, end) {
   return `${s}s`
 }
 
-// 解析 .NET TimeSpan 字符串为秒数锛堜繚鐣?浣嶅皬鏁帮級
+// 解析 .NET TimeSpan 字符串为秒数（保留两位小数）
 function parseDurationToSeconds(dur) {
   if (dur === null || dur === undefined || dur === '') return ''
   // If already a number, just format it
   if (typeof dur === 'number') return dur.toFixed(2)
   // If string that looks like a number (no colons)
   if (typeof dur === 'string' && !dur.includes(':')) return parseFloat(dur).toFixed(2)
-  // 格式: "HH:MM:SS.xxx" 鎴?"D.HH:MM:SS.xxx"
+  // 格式: "HH:MM:SS.xxx" 或 "D.HH:MM:SS.xxx"
   const parts = dur.split(':')
   if (parts.length < 3) return dur
   let h = 0, m = 0, s = 0
@@ -1237,7 +861,7 @@ function updateMapMarkers(data) {
     }
   })
 
-  // 涓嶈嚜鍔ㄧ缉鏀惧湴鍥撅紝淇濈暀鐢ㄦ埛褰撳墠瑙嗚
+  // 不自动缩放地图，保留用户当前视角
 }
 
 // 查询LCW详情
@@ -1250,57 +874,6 @@ async function showLCWDetail(row) {
   lcwFilterSearchText.value = ''
   try {
     lcwDetailData.value = await fetchLCWDetailRows(row)
-  } catch (err) {
-    console.error('查询LCW详情失败:', err)
-  } finally {
-    lcwLoading.value = false
-  }
-  return
-
-  showLCWModal.value = true
-  lcwDetailData.value = []
-  lcwLoading.value = true
-  lcwDetailColumns.forEach(c => lcwDetailFilters[c.key].clear())
-  lcwActiveFilterCol.value = null
-  lcwFilterSearchText.value = ''
-
-  // 使用查询时的时间范围锛岃€岄潪琛屾暟鎹殑时间
-  let startTime, endTime
-  if (activeMenu.value === 0) {
-    // 实时位置 - 当前时间减去时间范围
-    const now = new Date()
-    const hours = timeRangeHours[timeRange.value] || 2
-    const start = new Date(now.getTime() - hours * 3600 * 1000)
-    startTime = formatDateTime(start)
-    endTime = formatDateTime(now)
-  } else {
-    // 内容查询 - 用户选择的时间
-    startTime = fileQueryStartTime.value
-    endTime = fileQueryEndTime.value
-  }
-
-  const params = new URLSearchParams({
-    StartTime: startTime,
-    EndTime: endTime,
-    ChainID: row.chainID || ''
-  })
-
-  try {
-    const resp = await fetch(`/api/Result/SearchLCW?${params}`)
-    const text = await resp.text()
-    if (!text) return
-    const result = JSON.parse(text)
-    lcwDetailData.value = (result.data || []).map(item => ({
-      deviceNumber: item.deviceName ?? item.DeviceName ?? item.deviceNumber ?? item.DeviceNumber ?? '',
-      time: formatDisplayPlus8(item.time ?? item.Time),
-      isUl: (item.isUl ?? item.IsUl ?? item.isUL ?? item.IsUL) ? '上行' : '下行',
-      frequency: item.frequncy ?? item.frequency ?? item.Frequency ?? item.Frequncy ?? '',
-      imei: item.imei ?? item.Imei ?? item.IMEI ?? '',
-      chn: item.chn ?? item.Chn ?? item.channel ?? item.Channel ?? '',
-      signaling: item['信令类型'] ?? item.signaling ?? item.Signaling ?? '',
-      frameType: item.frameType ?? item.FrameType ?? '',
-      rawLine: item.rawLine ?? item.RawLine ?? ''
-    }))
   } catch (err) {
     console.error('查询LCW详情失败:', err)
   } finally {
@@ -1392,14 +965,14 @@ async function queryTrajectory(terminalId) {
     startTime = formatDateTime(start)
     endTime = formatDateTime(now)
   } else {
-    // 位置展示 - 鐢ㄧ敤鎴烽€夌殑时间
+    // 位置展示 - 使用用户选择的时间
     startTime = searchStartTime.value
     endTime = searchEndTime.value
   }
 
   trajectoryTimeRange.value = `${startTime.replace('T', ' ')} 至 ${endTime.replace('T', ' ')}`
 
-  // 缁ф壙褰撳墠椤甸潰鐨勬ā寮忓拰 CalStepSecond 璁剧疆
+  // 继承当前页面的模式和 CalStepSecond 设置
   const isRealtime = activeMenu.value === 0
     ? queryMode.value === 'realtime'
     : searchQueryMode.value === 'realtime'
@@ -1451,7 +1024,8 @@ async function queryTrajectory(terminalId) {
       // 画轨迹线（浅蓝色）
       L.polyline(latlngs, { color: '#91d5ff', weight: 3, opacity: 0.9 }).addTo(trajectoryMap)
 
-      // 在每段线段中间画箭头锛堟鑹?SVG锛?      // 注意锛氬睆骞昚轴向下嬶紝纬度向上锛屾墍浠lat鍙栧弽
+      // 在每段线段中间绘制橙色 SVG 箭头
+      // 屏幕 Y 轴向下，因此纬度差值需要取反
       for (let i = 0; i < latlngs.length - 1; i++) {
         const from = latlngs[i]
         const to = latlngs[i + 1]
@@ -1556,7 +1130,7 @@ watch(activeMenu, (val) => {
     markers = []
   }
 
-  // 清除鎵€鏈夊畾鏃跺櫒
+  // 清除所有定时器
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
   if (deviceRefreshTimer) { clearInterval(deviceRefreshTimer); deviceRefreshTimer = null }
@@ -1587,7 +1161,7 @@ function handleGlobalClick() {
 onMounted(async () => {
   document.addEventListener('click', handleGlobalClick)
   await nextTick()
-  // 鍒濆鍖?Leaflet 鍦板浘
+  // 初始化 Leaflet 地图
   map = L.map('map', {
     center: [30, 50],
     zoom: 3,
@@ -1831,7 +1405,7 @@ async function handleShutdown() {
   }
 }
 
-// 载荷淇℃伅寮圭獥
+// 载荷信息弹窗
 const showPayloadModal = ref(false)
 const currentPayloadData = ref(null)
 
@@ -1971,7 +1545,7 @@ function extractPayloadData(item) {
   }
 }
 
-// 格式化栬浇鑽蜂俊鎭负绾枃鏈紙鐢ㄤ簬列筛选夛級
+// 格式化载荷信息为纯文本（用于列筛选）
 function formatPayloadInfo(item) {
   const d = extractPayloadData(item)
   const parts = []
@@ -2001,7 +1575,7 @@ function downloadWav(base64Data, chainID, index) {
     a.click()
     URL.revokeObjectURL(url)
   } catch (e) {
-    console.error('WAV涓嬭浇澶辫触', e)
+    console.error('WAV 下载失败', e)
   }
 }
 
@@ -2202,1349 +1776,3 @@ function toggleFullscreen() {
   }
 }
 </script>
-
-<style>
-/* ===== 全局重置 ===== */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body, #app {
-  height: 100%;
-  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Microsoft YaHei UI", "PingFang SC", "Helvetica Neue", sans-serif;
-  font-size: 14px;
-  color: #2c3e50;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* ===== 整体布局 ===== */
-.layout {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* ===== 左侧导航栏===== */
-.sidebar {
-  width: 180px;
-  min-width: 180px;
-  background: linear-gradient(180deg, #0d4a7a 0%, #062a4f 100%);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  user-select: none;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
-  z-index: 10;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 22px 12px 28px;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  white-space: nowrap;
-}
-
-.menu {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 0 8px;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 16px;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 15px;
-  font-weight: 400;
-  letter-spacing: 0.5px;
-  transition: all 0.2s ease;
-  border-radius: 6px;
-  border-left: none;
-}
-
-.menu-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-}
-
-.menu-item.active {
-  background: rgba(77, 184, 255, 0.2);
-  color: #fff;
-  font-weight: 500;
-  box-shadow: inset 3px 0 0 #5cc5ff;
-}
-
-.menu-icon {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  opacity: 0.85;
-}
-
-.menu-item.active .menu-icon {
-  opacity: 1;
-}
-
-/* ===== 主内容区 ===== */
-.main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #f0f2f5;
-  overflow: hidden;
-}
-
-/* ===== 顶部工具栏===== */
-.toolbar {
-  height: 46px;
-  min-height: 46px;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid #e8e8e8;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.toolbar-left, .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.icon-btn {
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.icon-btn:hover {
-  background: #f0f0f0;
-}
-
-/* ===== 地图容器 ===== */
-.map-container {
-  flex: 1;
-  position: relative;
-  min-height: 0;
-}
-
-#map {
-  width: 100%;
-  height: 100%;
-}
-
-/* 实时位置 - 地图右上角控件*/
-.map-controls {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.map-select {
-  height: 34px;
-  padding: 0 30px 0 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  background: #fff;
-  font-family: inherit;
-  font-size: 13px;
-  color: #2c3e50;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.map-select:hover {
-  border-color: #b0b0b0;
-}
-
-.map-select:focus {
-  outline: none;
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
-}
-
-.export-btn {
-  height: 34px;
-  padding: 0 22px;
-  background: linear-gradient(135deg, #1890ff, #096dd9);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 3px;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
-  transition: all 0.2s;
-}
-
-.export-btn:hover {
-  background: linear-gradient(135deg, #40a9ff, #1890ff);
-  box-shadow: 0 4px 10px rgba(24, 144, 255, 0.35);
-}
-
-/* 位置展示 - 顶部查询栏*/
-.map-controls-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.96);
-  border-bottom: 1px solid #e0e0e0;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.datetime-input {
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  color: #2c3e50;
-  background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.datetime-input:hover {
-  border-color: #b0b0b0;
-}
-
-.datetime-input:focus {
-  outline: none;
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
-}
-
-.datetime-arrow {
-  color: #999;
-  font-size: 16px;
-  font-weight: 300;
-}
-
-.terminal-input {
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  color: #2c3e50;
-  width: 170px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.terminal-input:hover {
-  border-color: #b0b0b0;
-}
-
-.terminal-input:focus {
-  outline: none;
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
-}
-
-.terminal-input::placeholder {
-  color: #bbb;
-  font-weight: 300;
-}
-
-.imei-filter-input {
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  color: #2c3e50;
-  width: 150px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.imei-filter-input:hover { border-color: #b0b0b0; }
-.imei-filter-input:focus { outline: none; border-color: #1890ff; box-shadow: 0 0 0 2px rgba(24,144,255,0.15); }
-.imei-filter-input::placeholder { color: #bbb; }
-
-.query-btn {
-  height: 34px;
-  padding: 0 24px;
-  background: linear-gradient(135deg, #1890ff, #096dd9);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 1px;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
-  transition: all 0.2s;
-}
-
-.query-btn:hover {
-  background: linear-gradient(135deg, #40a9ff, #1890ff);
-  box-shadow: 0 4px 10px rgba(24, 144, 255, 0.35);
-}
-
-/* ===== 底部表格 ===== */
-.table-panel {
-  height: 160px;
-  min-height: 120px;
-  background: #fff;
-  border-top: 1px solid #e0e0e0;
-}
-
-.table-wrapper {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 1200px;
-}
-
-th, td {
-  padding: 4px 6px;
-  text-align: center;
-  font-size: 12px;
-  white-space: nowrap;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-th {
-  background: #fafafa;
-  color: #555;
-  font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  border-bottom: 2px solid #e8e8e8;
-}
-
-td {
-  color: #444;
-  font-variant-numeric: tabular-nums;
-}
-
-tbody tr {
-  transition: background 0.15s;
-}
-
-tbody tr:hover {
-  background: #e6f7ff;
-}
-
-.empty-row {
-  padding: 30px;
-  color: #aaa;
-  font-size: 13px;
-}
-
-/* ===== 内容查询页===== */
-.file-query-page {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #f0f2f5;
-}
-
-.file-query-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  background: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  flex-wrap: wrap;
-}
-.payload-filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 20px;
-  background: #fafafa;
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  flex-wrap: wrap;
-}
-.payload-filter-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #2c3e50;
-  white-space: nowrap;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: #444;
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.checkbox-label input[type="checkbox"] {
-  accent-color: #1890ff;
-  width: 15px;
-  height: 15px;
-  cursor: pointer;
-}
-
-.reset-btn {
-  height: 34px;
-  padding: 0 22px;
-  background: #fff;
-  color: #333;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 3px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.reset-btn:hover {
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
-.file-query-table-wrapper {
-  flex: 1;
-  overflow: auto;
-  padding: 16px;
-  /* 鎶婂渾瑙掑拰闃村奖鏀惧湪婊氬姩瀹瑰櫒涓婏紝涓嶅湪 table 涓婅 overflow:hidden锛?     鍚﹀垯浼氶樆鏂?th 鐨?position:sticky */
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.file-query-table-wrapper .device-table {
-  border-radius: 0;
-}
-
-/* ===== 列筛选===== */
-.filterable-th {
-  position: relative;
-}
-
-.filterable-th span {
-  margin-right: 4px;
-}
-
-.filter-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: none;
-  background: none;
-  color: #bbb;
-  cursor: pointer;
-  border-radius: 3px;
-  vertical-align: middle;
-  transition: all 0.2s;
-}
-
-.filter-icon-btn:hover {
-  color: #1890ff;
-  background: rgba(24, 144, 255, 0.1);
-}
-
-.filter-icon-btn.filter-active {
-  color: #1890ff;
-}
-
-.filter-dropdown {
-  position: fixed;
-  z-index: 9999;
-  width: 220px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e8e8e8;
-  padding: 8px 0;
-  text-align: left;
-}
-
-.filter-search {
-  width: calc(100% - 16px);
-  margin: 0 8px 6px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 12px;
-  color: #333;
-}
-
-.filter-search:focus {
-  outline: none;
-  border-color: #1890ff;
-}
-
-.filter-search::placeholder {
-  color: #bbb;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 8px;
-  padding: 0 8px 6px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.filter-actions button {
-  font-size: 12px;
-  color: #1890ff;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px 0;
-}
-
-.filter-actions button:hover {
-  text-decoration: underline;
-}
-
-.filter-options {
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 4px 0;
-}
-
-.filter-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #333;
-  cursor: pointer;
-  transition: background 0.15s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.filter-option:hover {
-  background: #f5f5f5;
-}
-
-.filter-option input[type="checkbox"] {
-  accent-color: #1890ff;
-  flex-shrink: 0;
-}
-
-.filter-empty {
-  padding: 12px;
-  text-align: center;
-  color: #aaa;
-  font-size: 12px;
-}
-
-.filter-footer {
-  padding: 6px 8px 2px;
-  border-top: 1px solid #f0f0f0;
-  text-align: right;
-}
-
-.filter-confirm {
-  height: 26px;
-  padding: 0 16px;
-  background: #1890ff;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.filter-confirm:hover {
-  background: #40a9ff;
-}
-
-.filter-options::-webkit-scrollbar {
-  width: 4px;
-}
-
-.filter-options::-webkit-scrollbar-thumb {
-  background: #ddd;
-  border-radius: 2px;
-}
-
-/* ===== 分页 ===== */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 20px;
-  background: #fff;
-  border-top: 1px solid #e8e8e8;
-  flex-shrink: 0;
-}
-
-.page-info {
-  font-size: 13px;
-  color: #666;
-}
-
-.page-btns {
-  display: flex;
-  gap: 4px;
-}
-
-.page-btn {
-  min-width: 32px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  background: #fff;
-  font-family: inherit;
-  font-size: 13px;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.page-btn:hover:not(:disabled) {
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
-.page-btn:disabled {
-  color: #ccc;
-  cursor: not-allowed;
-}
-
-.page-active {
-  background: #1890ff;
-  border-color: #1890ff;
-  color: #fff !important;
-}
-
-/* ===== 软件控制 - 设备信息页===== */
-.device-page {
-  flex: 1;
-  padding: 24px;
-  overflow: auto;
-  background: #f0f2f5;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.device-bar {
-  margin-bottom: 12px;
-}
-
-.device-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.device-card-section,
-.device-config-section {
-  padding: 18px 20px 20px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.device-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.device-section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.device-section-desc {
-  margin-top: 4px;
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.device-table-wrapper {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
-}
-
-.device-table {
-  width: auto;
-  min-width: 100%;
-  border-collapse: collapse;
-  table-layout: auto;
-}
-.file-query-fixed-table {
-  table-layout: fixed;
-  width: 1020px;
-}
-/* 实时位置搴曢儴閫氫俊浜嬩欢琛?*/
-.table-panel .device-table { table-layout: fixed; width: 100%; }
-.table-panel .device-table th:nth-child(1), .table-panel .device-table td:nth-child(1) { width: 65px; }
-.table-panel .device-table th:nth-child(2), .table-panel .device-table td:nth-child(2) { width: 160px; }
-.table-panel .device-table th:nth-child(3), .table-panel .device-table td:nth-child(3) { width: 140px; }
-.table-panel .device-table th:nth-child(4), .table-panel .device-table td:nth-child(4) { width: 140px; }
-.table-panel .device-table th:nth-child(5), .table-panel .device-table td:nth-child(5) { width: 85px; }
-.table-panel .device-table th:nth-child(6), .table-panel .device-table td:nth-child(6) { width: 120px; }
-.table-panel .device-table th:nth-child(7), .table-panel .device-table td:nth-child(7) { width: 190px; }
-.table-panel .device-table th:nth-child(8), .table-panel .device-table td:nth-child(8) { width: 80px; }
-.table-panel .device-table th:nth-child(9), .table-panel .device-table td:nth-child(9) { width: 120px; }
-
-.device-table th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #fafafa;
-  box-shadow: 0 2px 0 #e8e8e8;
-  color: #1890ff;
-  font-weight: 600;
-  font-size: 12px;
-  padding: 5px 4px;
-  text-align: center;
-  border-bottom: 2px solid #e8e8e8;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  white-space: nowrap;
-}
-
-.device-table td {
-  padding: 5px 4px;
-  text-align: center;
-  font-size: 12px;
-  color: #444;
-  border-bottom: 1px solid #f0f0f0;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.device-table tbody tr {
-  transition: background 0.15s;
-}
-
-.device-table tbody tr:hover {
-  background: #e6f7ff;
-}
-
-.status-light {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.status-light.online {
-  background: #52c41a;
-  box-shadow: 0 0 6px rgba(82, 196, 26, 0.5);
-}
-
-.status-light.offline {
-  background: #bbb;
-}
-
-.mesh-btn {
-  height: 28px;
-  padding: 0 14px;
-  background: linear-gradient(135deg, #1890ff, #096dd9);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.mesh-btn:hover {
-  background: linear-gradient(135deg, #40a9ff, #1890ff);
-  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
-}
-
-.device-config-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.device-config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
-}
-
-.device-config-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.device-config-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-}
-
-.device-config-input {
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  color: #2c3e50;
-  background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.device-config-input:hover {
-  border-color: #b0b0b0;
-}
-
-.device-config-input:focus {
-  outline: none;
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
-}
-
-.device-config-input[readonly] {
-  background: #f8fafc;
-  color: #64748b;
-}
-
-.device-switch-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 36px;
-}
-
-.device-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  width: 52px;
-  height: 30px;
-  cursor: pointer;
-}
-
-.device-switch input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  margin: 0;
-  cursor: pointer;
-}
-
-.device-switch-slider {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
-  background: #dbe2ea;
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28);
-  transition: background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.device-switch-slider::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
-  transition: transform 0.2s ease;
-}
-
-.device-switch input:checked + .device-switch-slider {
-  background: linear-gradient(135deg, #1890ff, #096dd9);
-  box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.14);
-}
-
-.device-switch input:checked + .device-switch-slider::after {
-  transform: translateX(22px);
-}
-
-.device-switch input:focus-visible + .device-switch-slider {
-  outline: 2px solid rgba(24, 144, 255, 0.28);
-  outline-offset: 2px;
-}
-
-.device-switch input:disabled + .device-switch-slider {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.device-switch-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-  min-width: 18px;
-}
-
-.device-config-message {
-  padding: 10px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  border: 1px solid transparent;
-}
-
-.device-config-message-info {
-  background: #e6f4ff;
-  border-color: #91caff;
-  color: #0958d9;
-}
-
-.device-config-message-success {
-  background: #f6ffed;
-  border-color: #b7eb8f;
-  color: #389e0d;
-}
-
-.device-config-message-warning {
-  background: #fffbe6;
-  border-color: #ffe58f;
-  color: #d48806;
-}
-
-.device-config-message-error {
-  background: #fff1f0;
-  border-color: #ffa39e;
-  color: #cf1322;
-}
-
-.danger-btn {
-  height: 34px;
-  padding: 0 22px;
-  background: linear-gradient(135deg, #ff7875, #cf1322);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(207, 19, 34, 0.22);
-  transition: all 0.2s;
-}
-
-.danger-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff9c99, #f5222d);
-  box-shadow: 0 4px 10px rgba(207, 19, 34, 0.28);
-}
-
-.danger-btn-secondary {
-  background: linear-gradient(135deg, #ff7875, #cf1322);
-  box-shadow: 0 2px 6px rgba(207, 19, 34, 0.22);
-}
-
-.danger-btn-secondary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff9c99, #f5222d);
-  box-shadow: 0 4px 10px rgba(207, 19, 34, 0.28);
-}
-
-.danger-btn:disabled,
-.device-config-toolbar .query-btn:disabled,
-.device-config-toolbar .reset-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.cpu-high {
-  color: #f5222d;
-  font-weight: 600;
-}
-
-/* ===== 倒计时徽章===== */
-.countdown-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 42px;
-  height: 34px;
-  padding: 0 10px;
-  background: #fff;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  color: #1890ff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* ===== 加载遮罩 ===== */
-.loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(2px);
-}
-
-.static-loading {
-  position: relative;
-  flex: none;
-  height: 200px;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e8e8e8;
-  border-top: 4px solid #1890ff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-text {
-  margin-top: 12px;
-  font-size: 14px;
-  color: #666;
-  font-weight: 500;
-}
-
-/* 閲嶅彔鐐硅仛鍚堝浘鏍囷紙SVG 娓叉煋锛屾棤闇€棰濆鏍峰紡锛?*/
-/* 灞曞紑鍚庝腑蹇冪殑鏀惰捣鎸夐挳 */
-.map-cluster-collapse {
-  width: 24px;
-  height: 24px;
-  line-height: 24px;
-  border-radius: 50%;
-  background: #ff4d4f;
-  border: 2px solid #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-  cursor: pointer;
-}
-/* 设备图钉图标 */
-.pin-icon {
-  background: none !important;
-  border: none !important;
-}
-
-/* Leaflet 缩放按钮样式 */
-.leaflet-control-zoom a {
-  width: 32px !important;
-  height: 32px !important;
-  line-height: 32px !important;
-  font-size: 16px !important;
-  border-radius: 6px !important;
-}
-
-/* 滚动条美化*/
-.table-wrapper::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.table-wrapper::-webkit-scrollbar-track {
-  background: #f5f5f5;
-}
-
-.table-wrapper::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 3px;
-}
-
-.table-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #aaa;
-}
-
-/* 轨迹弹窗 */
-.trajectory-modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.trajectory-modal {
-  background: #fff;
-  width: 90vw;
-  height: 85vh;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-}
-.location-preview-modal {
-  width: 94vw;
-  height: 90vh;
-}
-.trajectory-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  background: #1e3a5f;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-}
-.trajectory-modal-close {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 22px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-}
-.trajectory-modal-close:hover {
-  opacity: 0.7;
-}
-.trajectory-modal-body {
-  flex: 1;
-  position: relative;
-}
-.lcw-detail-wrapper {
-  padding: 10px 12px 12px;
-}
-.lcw-detail-table th,
-.lcw-detail-table td {
-  padding: 7px 10px;
-}
-.payload-btn {
-  padding: 2px 10px;
-  background: #1890ff;
-  color: #fff;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-  transition: background 0.15s;
-}
-.payload-btn:hover {
-  background: #096dd9;
-}
-.latlon-cell {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.latlon-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.location-view-btn {
-  padding: 1px 6px;
-  background: #fff;
-  color: #1890ff;
-  border: 1px solid #91caff;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-  transition: all 0.2s;
-}
-.location-view-btn:hover {
-  color: #096dd9;
-  border-color: #69b1ff;
-  background: #e6f4ff;
-}
-.payload-modal {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  width: 560px;
-  max-width: 90vw;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-}
-.payload-modal-body {
-  padding: 20px 24px 24px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.payload-section {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 12px;
-}
-.payload-section-label {
-  flex-shrink: 0;
-  width: 80px;
-  font-size: 12px;
-  font-weight: 600;
-  padding-top: 4px;
-  text-align: right;
-}
-.payload-tags {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.wav-download-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 12px;
-  border-radius: 4px;
-  border: 1px solid #52c41a;
-  background: #f6ffed;
-  color: #389e0d;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.wav-download-btn:hover {
-  background: #d9f7be;
-}
-.wav-icon {
-  font-size: 10px;
-}
-.payload-text-block {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-}
-.payload-text-line {
-  display: block;
-  font-size: 12px;
-  color: #389e0d;
-  line-height: 1.6;
-  word-break: break-all;
-}
-.payload-tag {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 4px;
-  border: 1px solid #91caff;
-  font-size: 12px;
-  line-height: 1.6;
-  background: #e6f4ff;
-  color: #0958d9;
-  word-break: break-all;
-}
-.detail-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.detail-btn {
-  padding: 2px 10px;
-  background: #1890ff;
-  color: #fff;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.detail-btn:hover {
-  background: #096dd9;
-}
-.detail-export-btn {
-  padding: 2px 10px;
-  background: #fff;
-  color: #333;
-  border: 1px solid #d9d9d9;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-  transition: all 0.2s;
-}
-.detail-export-btn:hover {
-  color: #1890ff;
-  border-color: #1890ff;
-}
-.arrow-icon {
-  background: none !important;
-  border: none !important;
-}
-</style>

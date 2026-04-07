@@ -3,10 +3,7 @@
     <!-- 左侧导航栏-->
     <aside class="sidebar">
       <div class="logo">
-        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-        <span>位置展示系统</span>
+        <span>信号识别定位系统</span>
       </div>
 
       <nav class="menu">
@@ -530,7 +527,7 @@ const sidebarCollapsed = ref(false)
 const menuItems = [
   { label: '实时位置', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>' },
   { label: '内容查询', icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/>' },
-  { label: '位置展示', icon: '<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.4 8 12 8 12s8-6.6 8-12a8 8 0 00-8-8z"/>' },
+  { label: '位置查询', icon: '<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.4 8 12 8 12s8-6.6 8-12a8 8 0 00-8-8z"/>' },
   { label: '设备信息', icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>' },
 ]
 
@@ -2246,18 +2243,12 @@ html, body, #app {
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 22px 16px 28px;
+  justify-content: center;
+  padding: 22px 12px 28px;
   font-size: 16px;
   font-weight: 600;
-  letter-spacing: 2px;
-}
-
-.logo-icon {
-  width: 26px;
-  height: 26px;
-  color: #5cc5ff;
-  flex-shrink: 0;
+  letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 .menu {

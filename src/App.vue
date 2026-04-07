@@ -236,9 +236,8 @@ let locationPreviewMap = null
 // 内容查询参数
 const fileQueryStartTime = ref('')
 const fileQueryEndTime = ref('')
-const fileQueryOnlyUl = ref(true)
+const fileQueryOnlyUl = ref(false)
 const fileQueryOnlyImei = ref(true)
-const fileQueryOnlyLocation = ref(true)
 const fileQueryImeiFilter = ref('')
 
 // 内容查询额外过滤
@@ -1654,7 +1653,6 @@ async function fetchCommEvents() {
     StartTime: formatDateTime(startTime),
     EndTime: formatDateTime(now),
     OnlyUl: 'false',
-    OnlyLocation: 'true',
     Count: '100'
   })
 
@@ -1699,7 +1697,6 @@ async function handleFileQuery() {
     EndTime: fileQueryEndTime.value,
     OnlyUl: String(fileQueryOnlyUl.value),
     OnlyImei: String(fileQueryOnlyImei.value),
-    OnlyLocation: String(fileQueryOnlyLocation.value),
     Count: '100000'
   })
 
@@ -1774,9 +1771,8 @@ function handleFileQueryReset() {
   // 这个函数现在主要给初始化和未来扩展用。
   // 如果后面你加了更多查询条件，记得在这里一起恢复默认值。
   initFileQueryTime()
-  fileQueryOnlyUl.value = true
+  fileQueryOnlyUl.value = false
   fileQueryOnlyImei.value = true
-  fileQueryOnlyLocation.value = true
   fileQueryTableData.value = []
   fileQueryPage.value = 1
   fileQueryColumns.forEach(c => fileQueryFilters[c.key] = new Set())

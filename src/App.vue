@@ -159,6 +159,9 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIconUrl from 'leaflet/dist/images/marker-icon.png'
+import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png'
 import { FullscreenOutlined } from '@ant-design/icons-vue'
 import AppSidebar from './components/app/AppSidebar.vue'
 import ColumnFilterDropdown from './components/app/ColumnFilterDropdown.vue'
@@ -169,6 +172,13 @@ import LcwDetailModal from './components/app/LcwDetailModal.vue'
 import MapModal from './components/app/MapModal.vue'
 import MapPanel from './components/app/MapPanel.vue'
 import PayloadModal from './components/app/PayloadModal.vue'
+
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2xUrl,
+  iconUrl: markerIconUrl,
+  shadowUrl: markerShadowUrl,
+})
 
 // 侧栏菜单
 const activeMenu = ref(0)

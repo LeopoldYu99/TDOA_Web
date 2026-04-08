@@ -203,15 +203,15 @@ const lcwLoading = ref(false)
 // 这一组列定义既决定表头显示，也决定导出 CSV 时的列顺序。
 // 后面如果你想给 LCW 详情加字段，通常先从这里开始改。
 const lcwDetailColumns = [
-  { key: 'deviceNumber', label: '设备编号' },
-  { key: 'time', label: '时间' },
-  { key: 'isUl', label: '方向' },
-  { key: 'frequency', label: '频率' },
-  { key: 'imei', label: 'IMEI' },
-  { key: 'chn', label: '信道' },
-  { key: 'signaling', label: '信号类型' },
-  { key: 'frameType', label: '帧类型' },
-  { key: 'rawLine', label: '原始数据' },
+  { key: 'deviceNumber', label: '设备编号', width: 120 },
+  { key: 'time', label: '时间', width: 180 },
+  { key: 'isUl', label: '方向', width: 80 },
+  { key: 'frequency', label: '频率', width: 110 },
+  { key: 'imei', label: 'IMEI', width: 150 },
+  { key: 'chn', label: '信道', width: 80 },
+  { key: 'signaling', label: '信号类型', width: 160 },
+  { key: 'frameType', label: '帧类型', width: 100 },
+  { key: 'rawLine', label: '原始数据', width: 960, ellipsis: false },
 ]
 // 每一列都用一个 Set 保存“当前勾选的值”。
 // 例如某列勾选了 “上行” 和 “下行”，对应的 Set 就会有两个字符串。

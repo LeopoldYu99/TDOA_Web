@@ -3,8 +3,8 @@
     :open="visible"
     title="LCW 详情"
     :footer="null"
-    :width="'90vw'"
-    :body-style="{ height: '70vh', overflow: 'auto', padding: '12px' }"
+    :width="'96vw'"
+    :body-style="{ height: '76vh', overflow: 'hidden', padding: '12px' }"
     destroy-on-close
     :animation="false"
     :mask-animation="false"
@@ -17,7 +17,7 @@
         :pagination="{ pageSize: 100, size: 'small', showTotal: total => `共 ${total} 条`, showQuickJumper: true }"
         size="small"
         bordered
-        :scroll="{ y: 'calc(70vh - 120px)' }"
+        :scroll="{ x: 1940, y: 'calc(76vh - 120px)' }"
       >
         <template #headerCell="{ column }">
           <span>{{ column.title }}</span>
@@ -33,7 +33,7 @@
         </template>
         <template #bodyCell="{ column, text }">
           <template v-if="column.key === 'rawLine'">
-            <span style="white-space: nowrap">{{ text }}</span>
+            <span class="raw-line-cell">{{ text }}</span>
           </template>
         </template>
       </a-table>
@@ -60,8 +60,8 @@ const antColumns = computed(() =>
     title: col.label,
     dataIndex: col.key,
     key: col.key,
-    ellipsis: true,
-    width: col.key === 'rawLine' ? 400 : undefined,
+    ellipsis: col.ellipsis ?? col.key !== 'rawLine',
+    width: col.width,
     align: 'center',
   }))
 )
@@ -70,5 +70,15 @@ const antColumns = computed(() =>
 <style scoped>
 .filter-btn-active {
   background: rgba(24, 144, 255, 0.1) !important;
+}
+
+.raw-line-cell {
+  display: inline-block;
+  min-width: max-content;
+  white-space: nowrap;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
 }
 </style>

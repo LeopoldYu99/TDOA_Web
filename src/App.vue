@@ -209,7 +209,7 @@ const lcwDetailColumns = [
   { key: 'frequency', label: '频率', width: 110 },
   { key: 'imei', label: 'IMEI', width: 150 },
   { key: 'chn', label: '信道', width: 80 },
-  { key: 'signaling', label: '信号类型', width: 160 },
+  { key: 'signaling', label: '信号类型', width: 220 },
   { key: 'frameType', label: '帧类型', width: 100 },
   { key: 'rawLine', label: '原始数据', width: 960, ellipsis: false },
 ]

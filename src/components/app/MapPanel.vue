@@ -30,14 +30,14 @@
           <a-select-option value="12hour">12hour</a-select-option>
           <a-select-option value="24hour">24hour</a-select-option>
         </a-select>
-        <a-button type="primary" size="small" @click="emit('realtime-query')">查 询</a-button>
+        <a-button type="primary" size="small" @click="emit('realtime-query')">查询</a-button>
         <a-badge
           class="countdown-badge-inline"
           :count="countdown"
           :overflow-count="999"
           :number-style="countdownNumberStyle"
         />
-        <a-button size="small" @click="emit('export')">导 出</a-button>
+        <a-button size="small" @click="emit('export')">导出</a-button>
       </div>
     </div>
 

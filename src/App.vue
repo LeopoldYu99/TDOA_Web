@@ -88,6 +88,14 @@
         <CommEventsTable
           v-if="activeMenu === 0"
           :comm-table-data="commTableData"
+          :loading="commEventsLoading"
+          :realtime-only-imei="realtimeOnlyImei"
+          :realtime-only-ul="realtimeOnlyUl"
+          :realtime-has-location-lat-lon="realtimeHasLocationLatLon"
+          @update:realtime-only-imei="v => realtimeOnlyImei = v"
+          @update:realtime-only-ul="v => realtimeOnlyUl = v"
+          @update:realtime-has-location-lat-lon="v => realtimeHasLocationLatLon = v"
+          @refresh="refreshCommEventsOnly"
           @open-location-preview="openLocationPreview"
           @open-payload-modal="openPayloadModal"
           @show-lcw-detail="showLCWDetail"
@@ -188,6 +196,9 @@ const menuLabels = { 0: '实时位置', 1: '内容查询', 2: '位置查询', 3:
 const queryMode = ref('realtime')
 const calStepSecond = ref('60')
 const timeRange = ref('2hour')
+const realtimeOnlyImei = ref(false)
+const realtimeOnlyUl = ref(false)
+const realtimeHasLocationLatLon = ref(false)
 
 // 位置展示查询参数
 const searchQueryMode = ref('realtime')
@@ -272,6 +283,7 @@ const fileQueryColumns = [
   { key: 'startTime', label: '通信起始时间', width: '130px' },
   { key: 'endTime', label: '通信截止时间', width: '130px' },
   { key: 'duration', label: '通信时长(秒)', width: '78px' },
+  { key: 'isUl', label: '上行', width: '70px' },
   { key: 'imei', label: 'IMEI', width: '110px' },
   { key: 'locationLatLon', label: '定位经纬度', width: '180px' },
   { key: 'payloadInfo', label: '载荷信息', width: '74px', noFilter: true },
@@ -460,6 +472,7 @@ let deviceRefreshTimer = null
 
 // 加载状态
 const loading = ref(false)
+const commEventsLoading = ref(false)
 
 // 倒计时
 const countdown = ref(60)
@@ -543,6 +556,28 @@ function formatDisplayPlus8(dateStr) {
 // 璁＄畻閫氫俊鏃堕暱
 function getChainIdFromItem(item) {
   return String(item?.chainID ?? item?.ChainID ?? item?.chainId ?? item?.ChainId ?? '').trim()
+}
+
+function formatHasUlValue(value) {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', '1', 'yes', 'y', 'ul', '上行', '是'].includes(normalized)) return '是'
+    if (['false', '0', 'no', 'n', 'dl', '下行', '否'].includes(normalized)) return '否'
+  }
+
+  if (typeof value === 'number') return value !== 0 ? '是' : '否'
+  return value ? '是' : '否'
+}
+
+function getCommEventHasUl(item) {
+  return formatHasUlValue(
+    item?.hasUl ??
+    item?.HasUl ??
+    item?.isUl ??
+    item?.IsUl ??
+    item?.isUL ??
+    item?.IsUL
+  )
 }
 
 function formatLocationLatLon(item) {
@@ -1155,6 +1190,12 @@ watch([queryMode, timeRange], () => {
   }
 })
 
+watch([realtimeOnlyImei, realtimeOnlyUl, realtimeHasLocationLatLon], () => {
+  if (activeMenu.value === 0) {
+    refreshCommEventsOnly()
+  }
+})
+
 // 切换菜单时讹紝娓呯┖鏁版嵁骞跺垏鎹㈤€昏緫
 watch(activeMenu, (val) => {
   tableData.value = []
@@ -1618,6 +1659,26 @@ function formatPayloadInfo(item) {
   return parts.join('\n')
 }
 
+function mapCommEventRowForUI(item) {
+  return {
+    deviceNumber: item.deviceNumber || '',
+    dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
+    startTime: formatDisplayPlus8(item.startTime),
+    endTime: formatDisplayPlus8(item.endTime),
+    duration: parseDurationToSeconds(item.duration),
+    isUl: getCommEventHasUl(item),
+    imei: item.imei || '',
+    payloadInfo: formatPayloadInfo(item),
+    payloadData: extractPayloadData(item),
+    locationLatLon: formatLocationLatLon(item),
+    chainID: item.chainID || ''
+  }
+}
+
+function mapCommEventRowsForUI(list) {
+  return (list || []).map(mapCommEventRowForUI)
+}
+
 function downloadWav(base64Data, chainID, index) {
   try {
     // 浏览器不能直接下载 base64 文本，需要先转成二进制 Blob。
@@ -1638,6 +1699,7 @@ function downloadWav(base64Data, chainID, index) {
 
 // 实时位置 - 获取通信事件
 async function fetchCommEvents() {
+  commEventsLoading.value = true
   const now = new Date()
   const hours = timeRangeHours[timeRange.value] || 2
   const startTime = new Date(now.getTime() - hours * 3600 * 1000)
@@ -1645,7 +1707,9 @@ async function fetchCommEvents() {
   const params = new URLSearchParams({
     StartTime: formatDateTime(startTime),
     EndTime: formatDateTime(now),
-    HasUl: 'false',
+    HasUl: String(realtimeOnlyUl.value),
+    OnlyImei: String(realtimeOnlyImei.value),
+    'Has定位经纬度': String(realtimeHasLocationLatLon.value),
     Count: '100'
   })
 
@@ -1654,24 +1718,16 @@ async function fetchCommEvents() {
     const text = await resp.text()
     if (!text) return
     const result = JSON.parse(text)
-    const list = result.data || []
-    // 这里就先把后端记录加工成“界面直接可用”的结构，
-    // 这样模板里只负责显示，不需要再写一堆兼容判断。
-    commTableData.value = list.map(item => ({
-      deviceNumber: item.deviceNumber || '',
-      dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
-      startTime: formatDisplayPlus8(item.startTime),
-      endTime: formatDisplayPlus8(item.endTime),
-      duration: parseDurationToSeconds(item.duration),
-      imei: item.imei || '',
-      payloadInfo: formatPayloadInfo(item),
-      payloadData: extractPayloadData(item),
-      locationLatLon: formatLocationLatLon(item),
-      chainID: item.chainID || ''
-    }))
+    commTableData.value = mapCommEventRowsForUI(result.data || [])
   } catch (err) {
     console.error('获取通信事件失败:', err)
+  } finally {
+    commEventsLoading.value = false
   }
+}
+
+async function refreshCommEventsOnly() {
+  await fetchCommEvents()
 }
 
 // 内容查询
@@ -1707,21 +1763,8 @@ async function handleFileQuery() {
     const text = await resp.text()
     if (!text) return
     const result = JSON.parse(text)
-    const list = result.data || []
     fileQueryPage.value = 1
-    // 和实时位置表一样，先把接口数据整理成前端自己的统一结构。
-    fileQueryTableData.value = list.map(item => ({
-      deviceNumber: item.deviceNumber || '',
-      dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
-      startTime: formatDisplayPlus8(item.startTime),
-      endTime: formatDisplayPlus8(item.endTime),
-      duration: parseDurationToSeconds(item.duration),
-      imei: item.imei || '',
-      payloadInfo: formatPayloadInfo(item),
-      payloadData: extractPayloadData(item),
-      locationLatLon: formatLocationLatLon(item),
-      chainID: item.chainID || ''
-    }))
+    fileQueryTableData.value = mapCommEventRowsForUI(result.data || [])
   } catch (err) {
     console.error('内容查询失败:', err)
   } finally {

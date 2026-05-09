@@ -1,9 +1,19 @@
 <template>
   <a-card title="通信事件" :bordered="false" size="small" class="comm-events-card">
+    <template #extra>
+      <div class="comm-events-toolbar">
+        <a-checkbox :checked="realtimeOnlyImei" @update:checked="v => emit('update:realtime-only-imei', v)">仅IMEI</a-checkbox>
+        <a-checkbox :checked="realtimeOnlyUl" @update:checked="v => emit('update:realtime-only-ul', v)">包含上行</a-checkbox>
+        <a-checkbox :checked="realtimeHasLocationLatLon" @update:checked="v => emit('update:realtime-has-location-lat-lon', v)">定位经纬度</a-checkbox>
+        <a-button size="small" :loading="loading" @click="emit('refresh')">刷新</a-button>
+      </div>
+    </template>
+
     <a-table
       :columns="columns"
       :data-source="commTableData"
       :pagination="false"
+      :loading="loading"
       size="small"
       :scroll="{ y: 240 }"
       row-key="chainID"
@@ -39,6 +49,7 @@ const columns = [
   { title: '通信起始时间', dataIndex: 'startTime', key: 'startTime', width: 160 },
   { title: '通信截止时间', dataIndex: 'endTime', key: 'endTime', width: 160 },
   { title: '通信时长(秒)', dataIndex: 'duration', key: 'duration', width: 100 },
+  { title: '上行', dataIndex: 'isUl', key: 'isUl', width: 80 },
   { title: 'IMEI', dataIndex: 'imei', key: 'imei', width: 130 },
   { title: '定位经纬度', dataIndex: 'locationLatLon', key: 'locationLatLon', width: 200 },
   { title: '载荷信息', key: 'payloadInfo', width: 90 },
@@ -50,9 +61,29 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
+  realtimeOnlyImei: {
+    type: Boolean,
+    default: false,
+  },
+  realtimeOnlyUl: {
+    type: Boolean,
+    default: false,
+  },
+  realtimeHasLocationLatLon: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits([
+  'update:realtime-only-imei',
+  'update:realtime-only-ul',
+  'update:realtime-has-location-lat-lon',
+  'refresh',
   'open-location-preview',
   'open-payload-modal',
   'show-lcw-detail',
@@ -64,5 +95,12 @@ const emit = defineEmits([
 .comm-events-card {
   margin-top: 12px;
   flex-shrink: 0;
+}
+
+.comm-events-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 </style>

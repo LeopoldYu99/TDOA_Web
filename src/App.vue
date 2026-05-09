@@ -495,6 +495,107 @@ let map = null
 let markers = [] // 存储地图上的标记
 let refreshTimer = null
 
+const MAP_TILE_PROVIDER = (import.meta.env.VITE_MAP_TILE_PROVIDER || 'amap').toLowerCase()
+const MAP_TILE_URL = import.meta.env.VITE_MAP_TILE_URL || ''
+const MAP_TILE_ATTRIBUTION = import.meta.env.VITE_MAP_TILE_ATTRIBUTION || ''
+const MAP_TILE_SUBDOMAINS = import.meta.env.VITE_MAP_TILE_SUBDOMAINS || ''
+const MAP_TILE_MAX_ZOOM = Number(import.meta.env.VITE_MAP_TILE_MAX_ZOOM || 18)
+const MAP_COORD_SYSTEM = (import.meta.env.VITE_MAP_COORD_SYSTEM || '').toLowerCase()
+
+const MAP_TILE_PROVIDERS = {
+  amap: {
+    url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}',
+    options: {
+      attribution: '&copy; AutoNavi',
+      subdomains: ['1', '2', '3', '4'],
+      maxZoom: 18
+    },
+    coordinateSystem: 'gcj02',
+    defaultCenter: [35.8617, 104.1954],
+    defaultZoom: 4
+  },
+  osm: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    },
+    coordinateSystem: 'wgs84',
+    defaultCenter: [30, 50],
+    defaultZoom: 3
+  }
+}
+
+function getMapTileProvider() {
+  if (MAP_TILE_PROVIDER === 'custom' && MAP_TILE_URL) {
+    return {
+      url: MAP_TILE_URL,
+      options: {
+        attribution: MAP_TILE_ATTRIBUTION,
+        subdomains: MAP_TILE_SUBDOMAINS ? MAP_TILE_SUBDOMAINS.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+        maxZoom: MAP_TILE_MAX_ZOOM
+      },
+      coordinateSystem: MAP_COORD_SYSTEM || 'wgs84',
+      defaultCenter: [35.8617, 104.1954],
+      defaultZoom: 4
+    }
+  }
+
+  return MAP_TILE_PROVIDERS[MAP_TILE_PROVIDER] || MAP_TILE_PROVIDERS.amap
+}
+
+const mapTileProvider = getMapTileProvider()
+const defaultMapCenter = mapTileProvider.defaultCenter || [30, 50]
+const defaultMapZoom = mapTileProvider.defaultZoom || 3
+
+function addBaseTileLayer(targetMap) {
+  return L.tileLayer(mapTileProvider.url, mapTileProvider.options).addTo(targetMap)
+}
+
+function isOutOfChina(lat, lng) {
+  return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271
+}
+
+function transformLat(x, y) {
+  let ret = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  ret += (20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2 / 3
+  ret += (20 * Math.sin(y * Math.PI) + 40 * Math.sin(y / 3 * Math.PI)) * 2 / 3
+  ret += (160 * Math.sin(y / 12 * Math.PI) + 320 * Math.sin(y * Math.PI / 30)) * 2 / 3
+  return ret
+}
+
+function transformLng(x, y) {
+  let ret = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  ret += (20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2 / 3
+  ret += (20 * Math.sin(x * Math.PI) + 40 * Math.sin(x / 3 * Math.PI)) * 2 / 3
+  ret += (150 * Math.sin(x / 12 * Math.PI) + 300 * Math.sin(x / 30 * Math.PI)) * 2 / 3
+  return ret
+}
+
+function wgs84ToGcj02(lat, lng) {
+  if (isOutOfChina(lat, lng)) return [lat, lng]
+
+  const a = 6378245.0
+  const ee = 0.00669342162296594323
+  let dLat = transformLat(lng - 105, lat - 35)
+  let dLng = transformLng(lng - 105, lat - 35)
+  const radLat = lat / 180 * Math.PI
+  let magic = Math.sin(radLat)
+  magic = 1 - ee * magic * magic
+  const sqrtMagic = Math.sqrt(magic)
+  dLat = (dLat * 180) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI)
+  dLng = (dLng * 180) / (a / sqrtMagic * Math.cos(radLat) * Math.PI)
+  return [lat + dLat, lng + dLng]
+}
+
+function toMapLatLng(lat, lng) {
+  const parsedLat = Number(lat)
+  const parsedLng = Number(lng)
+  if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) return [lat, lng]
+  if (mapTileProvider.coordinateSystem === 'gcj02') return wgs84ToGcj02(parsedLat, parsedLng)
+  return [parsedLat, parsedLng]
+}
+
 // 时间范围映射（小时数）
 const timeRangeHours = {
   '1hour': 1, '2hour': 2, '6hour': 6, '12hour': 12, '24hour': 24
@@ -636,17 +737,15 @@ function openLocationPreview(row) {
       locationPreviewMap = null
     }
 
+    const previewLatLng = toMapLatLng(parsed.lat, parsed.lon)
     locationPreviewMap = L.map('locationPreviewMap', {
-      center: [parsed.lat, parsed.lon],
+      center: previewLatLng,
       zoom: 12,
       zoomControl: true
     })
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19
-    }).addTo(locationPreviewMap)
+    addBaseTileLayer(locationPreviewMap)
 
-    L.marker([parsed.lat, parsed.lon]).addTo(locationPreviewMap)
+    L.marker(previewLatLng).addTo(locationPreviewMap)
       .bindPopup(`<b>定位点</b><br>纬度: ${parsed.lat.toFixed(6)}<br>经度: ${parsed.lon.toFixed(6)}`)
       .openPopup()
 
@@ -904,7 +1003,8 @@ function updateMapMarkers(data) {
   })
 
   Object.entries(coordGroups).forEach(([key, group]) => {
-    const [lat, lng] = key.split(',').map(Number)
+    const [sourceLat, sourceLng] = key.split(',').map(Number)
+    const [lat, lng] = toMapLatLng(sourceLat, sourceLng)
     if (group.length === 1) {
       // 单点，直接渲染
       markers.push(createSingleMarker(group[0], lat, lng))
@@ -1063,14 +1163,11 @@ async function queryTrajectory(terminalId) {
     trajectoryMap = null
   }
   trajectoryMap = L.map('trajectoryMap', {
-    center: [30, 50],
-    zoom: 3,
+    center: defaultMapCenter,
+    zoom: defaultMapZoom,
     zoomControl: true
   })
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19
-  }).addTo(trajectoryMap)
+  addBaseTileLayer(trajectoryMap)
 
   try {
     const resp = await fetch(`/api/Result/SearchCoordinate?${params}`)
@@ -1086,7 +1183,7 @@ async function queryTrajectory(terminalId) {
 
       if (sorted.length === 0) return
 
-      const latlngs = sorted.map(item => [item.latitude, item.longitude])
+      const latlngs = sorted.map(item => toMapLatLng(item.latitude, item.longitude))
 
       // 画轨迹线（浅蓝色）
       L.polyline(latlngs, { color: '#91d5ff', weight: 3, opacity: 0.9 }).addTo(trajectoryMap)
@@ -1237,19 +1334,15 @@ onMounted(async () => {
   await nextTick()
   // 初始化 Leaflet 地图
   map = L.map('map', {
-    center: [30, 50],
-    zoom: 3,
+    center: defaultMapCenter,
+    zoom: defaultMapZoom,
     zoomControl: false
   })
 
   // 左上角缩放控件
   L.control.zoom({ position: 'topleft' }).addTo(map)
 
-  // OpenStreetMap 在线瓦片
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19
-  }).addTo(map)
+  addBaseTileLayer(map)
 
   // 首次加载数据
   handleRealtimeQuery()

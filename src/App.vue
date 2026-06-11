@@ -28,6 +28,7 @@
           v-model:payload-filter-signaling="payloadFilterSignaling"
           v-model:payload-filter-idapp-x-y-z="payloadFilterIdappXYZ"
           v-model:payload-filter-aircraft="payloadFilterAircraft"
+          v-model:payload-filter-no-acars="payloadFilterNoAcars"
           v-model:payload-filter-voice="payloadFilterVoice"
           v-model:payload-filter-sms="payloadFilterSms"
           v-model:payload-filter-ip="payloadFilterIp"
@@ -41,6 +42,8 @@
           :file-query-filtered-data="fileQueryFilteredData"
           :file-query-total-pages="fileQueryTotalPages"
           :file-query-visible-pages="fileQueryVisiblePages"
+          :file-query-count="fileQueryCount"
+          :file-query-count-loading="fileQueryCountLoading"
           @query="handleFileQuery"
           @export="handleFileQueryExport"
           @toggle-filter-dropdown="toggleFilterDropdown"
@@ -268,6 +271,7 @@ const payloadFilterLocationLatLon = ref(false)
 const payloadFilterSignaling = ref(false)
 const payloadFilterIdappXYZ = ref(false)
 const payloadFilterAircraft = ref(false)
+const payloadFilterNoAcars = ref(false)
 const payloadFilterVoice = ref(false)
 const payloadFilterSms = ref(false)
 const payloadFilterIp = ref(false)
@@ -276,6 +280,8 @@ const payloadFilterIdapp = ref(false)
 const fileQueryTableData = ref([])
 const fileQueryPage = ref(1)
 const fileQueryPageSize = 50
+const fileQueryCount = ref(null)
+const fileQueryCountLoading = ref(false)
 
 const fileQueryColumns = [
   { key: 'deviceNumber', label: '设备编号', width: '65px' },
@@ -404,6 +410,10 @@ const fileQueryFilteredData = computed(() => {
       const kw = fileQueryImeiFilter.value.trim().toLowerCase()
       if (!String(row.imei || '').toLowerCase().includes(kw)) return false
     }
+
+    const hasAcars = row.payloadData?.acars?.length > 0
+    if (payloadFilterAircraft.value && !hasAcars) return false
+    if (payloadFilterNoAcars.value && hasAcars) return false
 
     // 列筛选（跳过 noFilter 列）
     if (!fileQueryColumns.every(col => {
@@ -1823,6 +1833,46 @@ async function refreshCommEventsOnly() {
   await fetchCommEvents()
 }
 
+function buildFileQueryParams({ includeCountLimit = false } = {}) {
+  const params = new URLSearchParams({
+    StartTime: fileQueryStartTime.value,
+    EndTime: fileQueryEndTime.value,
+    HasUl: String(fileQueryOnlyUl.value),
+    OnlyImei: String(fileQueryOnlyImei.value),
+    'Has定位经纬度': String(payloadFilterLocationLatLon.value),
+    'Has信令类型': String(payloadFilterSignaling.value),
+    'Has播发经纬度': String(payloadFilterIdappXYZ.value),
+    'HasACARS': String(payloadFilterAircraft.value),
+    'NotHasACARS': String(payloadFilterNoAcars.value),
+    'Has语音通话': String(payloadFilterVoice.value),
+    'Has短信数据': String(payloadFilterSms.value),
+    'HasIP数据': String(payloadFilterIp.value),
+    'Has低速数据': String(payloadFilterLowSpeed.value),
+    'Has解析数据': String(payloadFilterIdapp.value),
+  })
+
+  if (includeCountLimit) params.set('Count', '100000')
+  return params
+}
+
+async function fetchFileQueryRows(params) {
+  const resp = await fetch(`/api/Result/SearchCommEvent?${params}`)
+  const text = await resp.text()
+  if (!text) return []
+  const result = JSON.parse(text)
+  return mapCommEventRowsForUI(result.data || [])
+}
+
+async function fetchFileQueryCount(params) {
+  const resp = await fetch(`/api/Result/SearchCommEventCount?${params}`)
+  const text = await resp.text()
+  if (!text) return null
+  const result = JSON.parse(text)
+  const value = result?.data ?? result?.Data ?? result
+  const count = Number(value)
+  return Number.isFinite(count) ? count : null
+}
+
 // 内容查询
 async function handleFileQuery() {
   if (!fileQueryStartTime.value || !fileQueryEndTime.value) return
@@ -1834,34 +1884,33 @@ async function handleFileQuery() {
   fileQueryPage.value = 1
 
   loading.value = true
-  const params = new URLSearchParams({
-    StartTime: fileQueryStartTime.value,
-    EndTime: fileQueryEndTime.value,
-    HasUl: String(fileQueryOnlyUl.value),
-    OnlyImei: String(fileQueryOnlyImei.value),
-    'Has定位经纬度': String(payloadFilterLocationLatLon.value),
-    'Has信令类型': String(payloadFilterSignaling.value),
-    'Has播发经纬度': String(payloadFilterIdappXYZ.value),
-    'HasACARS': String(payloadFilterAircraft.value),
-    'Has语音通话': String(payloadFilterVoice.value),
-    'Has短信数据': String(payloadFilterSms.value),
-    'HasIP数据': String(payloadFilterIp.value),
-    'Has低速数据': String(payloadFilterLowSpeed.value),
-    'Has解析数据': String(payloadFilterIdapp.value),
-    Count: '100000'
-  })
+  fileQueryCount.value = null
+  fileQueryCountLoading.value = true
+  const rowsParams = buildFileQueryParams({ includeCountLimit: true })
+  const countParams = buildFileQueryParams()
 
   try {
-    const resp = await fetch(`/api/Result/SearchCommEvent?${params}`)
-    const text = await resp.text()
-    if (!text) return
-    const result = JSON.parse(text)
-    fileQueryPage.value = 1
-    fileQueryTableData.value = mapCommEventRowsForUI(result.data || [])
-  } catch (err) {
-    console.error('内容查询失败:', err)
+    const [rowsResult, countResult] = await Promise.allSettled([
+      fetchFileQueryRows(rowsParams),
+      fetchFileQueryCount(countParams),
+    ])
+
+    if (rowsResult.status === 'fulfilled') {
+      fileQueryPage.value = 1
+      fileQueryTableData.value = rowsResult.value
+    } else {
+      console.error('内容查询失败:', rowsResult.reason)
+    }
+
+    if (countResult.status === 'fulfilled') {
+      fileQueryCount.value = countResult.value
+    } else {
+      fileQueryCount.value = null
+      console.error('内容数量查询失败:', countResult.reason)
+    }
   } finally {
     loading.value = false
+    fileQueryCountLoading.value = false
   }
 }
 
@@ -1912,6 +1961,7 @@ function handleFileQueryReset() {
   fileQueryOnlyUl.value = false
   fileQueryOnlyImei.value = true
   fileQueryTableData.value = []
+  fileQueryCount.value = null
   fileQueryPage.value = 1
   fileQueryColumns.forEach(c => fileQueryFilters[c.key] = new Set())
   // 重置时把所有前端勾选过滤恢复到默认态，避免切页后沿用旧条件。
@@ -1919,6 +1969,7 @@ function handleFileQueryReset() {
   payloadFilterSignaling.value = false
   payloadFilterIdappXYZ.value = false
   payloadFilterAircraft.value = false
+  payloadFilterNoAcars.value = false
   payloadFilterVoice.value = false
   payloadFilterSms.value = false
   payloadFilterIp.value = false

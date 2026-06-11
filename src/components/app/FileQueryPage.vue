@@ -1,34 +1,39 @@
 <template>
   <div class="file-query-page">
     <a-card :bordered="false" size="small">
-      <div class="query-bar">
-        <input
-          type="datetime-local"
-          :value="fileQueryStartTime"
-          @input="emit('update:fileQueryStartTime', $event.target.value)"
-          class="native-datetime"
-          step="1"
-        />
-        <span style="color: #999; flex-shrink: 0">→</span>
-        <input
-          type="datetime-local"
-          :value="fileQueryEndTime"
-          @input="emit('update:fileQueryEndTime', $event.target.value)"
-          class="native-datetime"
-          step="1"
-        />
-        <a-checkbox :checked="fileQueryOnlyUl" @update:checked="v => emit('update:fileQueryOnlyUl', v)">包含上行</a-checkbox>
-        <a-checkbox :checked="fileQueryOnlyImei" @update:checked="v => emit('update:fileQueryOnlyImei', v)">仅IMEI</a-checkbox>
-        <a-input
-          :value="fileQueryImeiFilter"
-          @update:value="v => emit('update:fileQueryImeiFilter', v)"
-          placeholder="IMEI过滤..."
-          style="width: 150px"
-          size="small"
-          allow-clear
-        />
-        <a-button type="primary" size="small" @click="emit('query')">查 询</a-button>
-        <a-button size="small" @click="emit('export')">导出</a-button>
+      <div class="query-card-header">
+        <div class="query-bar">
+          <input
+            type="datetime-local"
+            :value="fileQueryStartTime"
+            @input="emit('update:fileQueryStartTime', $event.target.value)"
+            class="native-datetime"
+            step="1"
+          />
+          <span style="color: #999; flex-shrink: 0">→</span>
+          <input
+            type="datetime-local"
+            :value="fileQueryEndTime"
+            @input="emit('update:fileQueryEndTime', $event.target.value)"
+            class="native-datetime"
+            step="1"
+          />
+          <a-checkbox :checked="fileQueryOnlyUl" @update:checked="v => emit('update:fileQueryOnlyUl', v)">包含上行</a-checkbox>
+          <a-checkbox :checked="fileQueryOnlyImei" @update:checked="v => emit('update:fileQueryOnlyImei', v)">仅IMEI</a-checkbox>
+          <a-input
+            :value="fileQueryImeiFilter"
+            @update:value="v => emit('update:fileQueryImeiFilter', v)"
+            placeholder="IMEI过滤..."
+            style="width: 150px"
+            size="small"
+            allow-clear
+          />
+          <a-button type="primary" size="small" @click="emit('query')">查 询</a-button>
+          <a-button size="small" @click="emit('export')">导出</a-button>
+        </div>
+        <div class="query-count">
+          数量：{{ fileQueryCountText }}
+        </div>
       </div>
 
       <div class="payload-filter-bar">
@@ -36,7 +41,8 @@
         <a-checkbox :checked="payloadFilterLocationLatLon" @update:checked="v => emit('update:payloadFilterLocationLatLon', v)">定位经纬度</a-checkbox>
         <a-checkbox :checked="payloadFilterSignaling" @update:checked="v => emit('update:payloadFilterSignaling', v)">信令类型</a-checkbox>
         <a-checkbox :checked="payloadFilterIdappXYZ" @update:checked="v => emit('update:payloadFilterIdappXYZ', v)">播发经纬度</a-checkbox>
-        <a-checkbox :checked="payloadFilterAircraft" @update:checked="v => emit('update:payloadFilterAircraft', v)">ACARS</a-checkbox>
+        <a-checkbox :checked="payloadFilterAircraft" @update:checked="setPayloadFilterAircraft">包含ACARS</a-checkbox>
+        <a-checkbox :checked="payloadFilterNoAcars" @update:checked="setPayloadFilterNoAcars">不包含ACARS</a-checkbox>
         <a-checkbox :checked="payloadFilterVoice" @update:checked="v => emit('update:payloadFilterVoice', v)">语音通话</a-checkbox>
         <a-checkbox :checked="payloadFilterSms" @update:checked="v => emit('update:payloadFilterSms', v)">短信数据</a-checkbox>
         <a-checkbox :checked="payloadFilterIp" @update:checked="v => emit('update:payloadFilterIp', v)">IP数据</a-checkbox>
@@ -122,6 +128,7 @@ const props = defineProps({
   payloadFilterSignaling: { type: Boolean, default: false },
   payloadFilterIdappXYZ: { type: Boolean, default: false },
   payloadFilterAircraft: { type: Boolean, default: false },
+  payloadFilterNoAcars: { type: Boolean, default: false },
   payloadFilterVoice: { type: Boolean, default: false },
   payloadFilterSms: { type: Boolean, default: false },
   payloadFilterIp: { type: Boolean, default: false },
@@ -135,6 +142,8 @@ const props = defineProps({
   fileQueryPage: { type: Number, default: 1 },
   fileQueryTotalPages: { type: Number, default: 1 },
   fileQueryVisiblePages: { type: Array, default: () => [] },
+  fileQueryCount: { type: Number, default: null },
+  fileQueryCountLoading: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -147,6 +156,7 @@ const emit = defineEmits([
   'update:payloadFilterSignaling',
   'update:payloadFilterIdappXYZ',
   'update:payloadFilterAircraft',
+  'update:payloadFilterNoAcars',
   'update:payloadFilterVoice',
   'update:payloadFilterSms',
   'update:payloadFilterIp',
@@ -175,14 +185,49 @@ const antColumns = computed(() => {
   cols.push({ title: '详情', key: 'actions', width: 120, noFilter: true, align: 'center' })
   return cols
 })
+
+const fileQueryCountText = computed(() => {
+  if (props.fileQueryCountLoading) return '查询中...'
+  if (props.fileQueryCount === null || props.fileQueryCount === undefined) return '--'
+  return props.fileQueryCount.toLocaleString()
+})
+
+function setPayloadFilterAircraft(checked) {
+  emit('update:payloadFilterAircraft', checked)
+  if (checked) emit('update:payloadFilterNoAcars', false)
+}
+
+function setPayloadFilterNoAcars(checked) {
+  emit('update:payloadFilterNoAcars', checked)
+  if (checked) emit('update:payloadFilterAircraft', false)
+}
 </script>
 
 <style scoped>
+.query-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
 .query-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.query-count {
+  flex-shrink: 0;
+  min-width: 96px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: #1677ff;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 .payload-filter-bar {
   display: flex;

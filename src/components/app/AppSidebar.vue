@@ -68,6 +68,10 @@
         <template #icon><EnvironmentOutlined /></template>
         <span>位置查询</span>
       </a-menu-item>
+      <a-menu-item key="4">
+        <template #icon><EnvironmentOutlined /></template>
+        <span>播发位置</span>
+      </a-menu-item>
       <a-menu-item key="3">
         <template #icon><SettingOutlined /></template>
         <span>设备信息</span>

@@ -54,7 +54,7 @@
         />
 
         <MapPanel
-          v-show="activeMenu === 0 || activeMenu === 2"
+          v-show="activeMenu === 0 || activeMenu === 2 || activeMenu === 4"
           :active-menu="activeMenu"
           :loading="loading"
           :countdown="countdown"
@@ -66,8 +66,13 @@
           v-model:search-start-time="searchStartTime"
           v-model:search-end-time="searchEndTime"
           v-model:search-terminal-id="searchTerminalId"
+          v-model:broadcast-start-time="broadcastStartTime"
+          v-model:broadcast-end-time="broadcastEndTime"
+          v-model:broadcast-terminal-id="broadcastTerminalId"
+          :broadcast-result-count="broadcastResultCount"
           @realtime-query="handleRealtimeQuery"
           @search="handleSearch"
+          @broadcast-query="handleBroadcastPositionQuery"
           @export="handleExport"
         />
 
@@ -193,7 +198,7 @@ L.Icon.Default.mergeOptions({
 
 // 侧栏菜单
 const activeMenu = ref(0)
-const menuLabels = { 0: '实时位置', 1: '内容查询', 2: '位置查询', 3: '设备信息' }
+const menuLabels = { 0: '实时位置', 1: '内容查询', 2: '位置查询', 3: '设备信息', 4: '播发位置' }
 
 // 地图控件状态 - 实时位置
 const queryMode = ref('realtime')
@@ -209,6 +214,13 @@ const searchCalStepSecond = ref('60')
 const searchStartTime = ref('')
 const searchEndTime = ref('')
 const searchTerminalId = ref('')
+
+// 播发位置查询参数
+const broadcastStartTime = ref('')
+const broadcastEndTime = ref('')
+const broadcastTerminalId = ref('')
+const broadcastResultCount = ref(null)
+const broadcastPositionLimit = 10000
 
 // LCW详情弹窗
 const showLCWModal = ref(false)
@@ -494,6 +506,13 @@ function initSearchTime() {
   const oneHourAgo = new Date(now.getTime() - 3600 * 1000)
   searchEndTime.value = formatDateTimeLocal(now)
   searchStartTime.value = formatDateTimeLocal(oneHourAgo)
+}
+
+function initBroadcastQueryTime() {
+  const now = new Date()
+  const oneHourAgo = new Date(now.getTime() - 3600 * 1000)
+  broadcastEndTime.value = formatDateTimeLocal(now)
+  broadcastStartTime.value = formatDateTimeLocal(oneHourAgo)
 }
 
 function formatDateTimeLocal(date) {
@@ -882,6 +901,17 @@ function createPinIcon(color) {
 // 閲嶅彔鐐硅仛鍚堢姸鎬侊細key -> { lat, lng, items, clusterMarker, expanded, individualMarkers }
 let clusterGroups = {}
 
+function clearMapMarkers() {
+  markers.forEach(m => map?.removeLayer(m))
+  Object.values(clusterGroups).forEach(g => {
+    g.individualMarkers?.forEach(m => map?.removeLayer(m))
+    if (g.collapseMarker) map?.removeLayer(g.collapseMarker)
+    if (g.clusterMarker) map?.removeLayer(g.clusterMarker)
+  })
+  markers = []
+  clusterGroups = {}
+}
+
 function createClusterIcon(count) {
   const r = count > 99 ? 20 : count > 9 ? 18 : 16
   const d = r * 2
@@ -939,6 +969,47 @@ function createSingleMarker(item, lat, lng) {
   return marker
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]))
+}
+
+function formatNumberCell(value, digits = 6) {
+  const num = Number(value)
+  return Number.isFinite(num) ? num.toFixed(digits) : String(value ?? '')
+}
+
+function createBroadcastSingleMarker(item, lat, lng) {
+  const marker = L.circleMarker([lat, lng], {
+    radius: 7,
+    fillColor: '#fa8c16',
+    color: '#fff',
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 0.88
+  }).addTo(map)
+
+  const popupContent =
+    `<div style="font-size:13px;line-height:1.8;min-width:210px;">` +
+    `<div style="font-weight:600;font-size:14px;color:#1e3a5f;border-bottom:1px solid #e8e8e8;padding-bottom:4px;margin-bottom:4px;">播发位置</div>` +
+    `<div>识别码: ${escapeHtml(item.chainID || '-')}</div>` +
+    `<div>IMEI: ${escapeHtml(item.imei || '-')}</div>` +
+    `<div>纬度: ${escapeHtml(formatNumberCell(item.latitude))}</div>` +
+    `<div>经度: ${escapeHtml(formatNumberCell(item.longitude))}</div>` +
+    `<div>高度: ${escapeHtml(item.altitude !== '' && item.altitude !== null && item.altitude !== undefined ? `${formatNumberCell(item.altitude, 3)}m` : '-')}</div>` +
+    (item.startTime ? `<div>时间: ${escapeHtml(formatDisplayPlus8(item.startTime))}</div>` : '') +
+    `<div style="margin-top:4px;color:#666;">${escapeHtml(item.idappXYZ || '')}</div>` +
+    `</div>`
+
+  marker.bindPopup(popupContent)
+  return marker
+}
+
 // 展开聚合：移除聚合图标，在圆形范围内显示各终端标记
 function expandCluster(key) {
   const g = clusterGroups[key]
@@ -965,7 +1036,8 @@ function expandCluster(key) {
     const angle = (2 * Math.PI * idx) / n - Math.PI / 2
     const lat = g.lat + R * Math.cos(angle)
     const lng = g.lng + R * Math.sin(angle)
-    const m = createSingleMarker(item, lat, lng)
+    const markerFactory = g.type === 'broadcast' ? createBroadcastSingleMarker : createSingleMarker
+    const m = markerFactory(item, lat, lng)
     g.individualMarkers.push(m)
   })
   // 鏀惰捣鎸夐挳
@@ -993,13 +1065,7 @@ function collapseCluster(key) {
 }
 
 function updateMapMarkers(data) {
-  // 清除鏃ф爣璁帮紙鍚凡灞曞紑鐨勪釜浣撴爣璁帮級
-  markers.forEach(m => map.removeLayer(m))
-  Object.values(clusterGroups).forEach(g => {
-    g.individualMarkers.forEach(m => map.removeLayer(m))
-  })
-  markers = []
-  clusterGroups = {}
+  clearMapMarkers()
 
   if (!data || data.length === 0) return
 
@@ -1028,6 +1094,33 @@ function updateMapMarkers(data) {
   })
 
   // 不自动缩放地图，保留用户当前视角
+}
+
+function updateBroadcastMapMarkers(data) {
+  clearMapMarkers()
+
+  if (!data || data.length === 0) return
+
+  const coordGroups = {}
+  data.forEach(item => {
+    if (!item.latitude || !item.longitude || item.latitude === 0 || item.longitude === 0) return
+    const key = `${Number(item.latitude).toFixed(6)},${Number(item.longitude).toFixed(6)}`
+    if (!coordGroups[key]) coordGroups[key] = []
+    coordGroups[key].push(item)
+  })
+
+  Object.entries(coordGroups).forEach(([key, group]) => {
+    const [sourceLat, sourceLng] = key.split(',').map(Number)
+    const [lat, lng] = toMapLatLng(sourceLat, sourceLng)
+    if (group.length === 1) {
+      markers.push(createBroadcastSingleMarker(group[0], lat, lng))
+    } else {
+      const clusterMarker = L.marker([lat, lng], { icon: createClusterIcon(group.length), zIndexOffset: 500 }).addTo(map)
+      clusterMarker.on('click', () => expandCluster(key))
+      markers.push(clusterMarker)
+      clusterGroups[key] = { lat, lng, items: group, clusterMarker, expanded: false, individualMarkers: [], collapseMarker: null, type: 'broadcast' }
+    }
+  })
 }
 
 function closeLCWModal() {
@@ -1306,10 +1399,7 @@ watch([realtimeOnlyImei, realtimeOnlyUl, realtimeHasLocationLatLon], () => {
 // 切换菜单时讹紝娓呯┖鏁版嵁骞跺垏鎹㈤€昏緫
 watch(activeMenu, (val) => {
   tableData.value = []
-  if (map) {
-    markers.forEach(m => map.removeLayer(m))
-    markers = []
-  }
+  if (map) clearMapMarkers()
 
   // 清除所有定时器
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
@@ -1330,6 +1420,10 @@ watch(activeMenu, (val) => {
     fetchDeviceInfo()
     fetchDeviceConfiguration()
     deviceRefreshTimer = setInterval(fetchDeviceInfo, 120000)
+  } else if (val === 4) {
+    broadcastResultCount.value = null
+    nextTick(() => { if (map) map.invalidateSize() })
+    if (!broadcastStartTime.value) initBroadcastQueryTime()
   }
 })
 
@@ -1797,6 +1891,114 @@ function downloadWav(base64Data, chainID, index) {
     URL.revokeObjectURL(url)
   } catch (e) {
     console.error('WAV 下载失败', e)
+  }
+}
+
+function parseBroadcastLatLonText(text) {
+  const source = String(text || '')
+  const latMatch = /Lat\s*=\s*([+-]?\d+(?:\.\d+)?)/i.exec(source)
+  const lonMatch = /Lon\s*=\s*([+-]?\d+(?:\.\d+)?)/i.exec(source)
+  if (!latMatch || !lonMatch) return null
+
+  const lat = Number(latMatch[1])
+  const lon = Number(lonMatch[1])
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+  if (lat === 0 && lon === 0) return null
+
+  const altMatch = /Alt\s*=\s*([+-]?\d+(?:\.\d+)?)/i.exec(source)
+  const alt = altMatch ? Number(altMatch[1]) : null
+  return { lat, lon, alt: Number.isFinite(alt) ? alt : null }
+}
+
+function getImeiFromItem(item) {
+  return String(item?.imei ?? item?.Imei ?? item?.IMEI ?? '').trim()
+}
+
+function itemMatchesBroadcastTerminal(item, keyword) {
+  const kw = keyword.trim().toLowerCase()
+  if (!kw) return true
+
+  const candidates = [
+    item?.terminalID,
+    item?.TerminalID,
+    item?.terminalId,
+    item?.TerminalId,
+    getImeiFromItem(item),
+    getChainIdFromItem(item),
+    ...toArr(item?.tmsi ?? item?.Tmsi ?? item?.TMSI)
+  ]
+
+  return candidates
+    .map(v => String(v || '').toLowerCase())
+    .some(v => v.includes(kw))
+}
+
+function mapBroadcastPositionRowsForMap(list) {
+  const rows = []
+  const target = broadcastTerminalId.value.trim()
+  for (const item of (list || []).slice(0, broadcastPositionLimit)) {
+    if (!itemMatchesBroadcastTerminal(item, target)) continue
+
+    const values = toArr(item?.idappXYZ ?? item?.IdappXYZ)
+    for (const value of values) {
+      const parsed = parseBroadcastLatLonText(value)
+      if (!parsed) continue
+
+      rows.push({
+        chainID: getChainIdFromItem(item),
+        imei: getImeiFromItem(item),
+        latitude: parsed.lat,
+        longitude: parsed.lon,
+        altitude: parsed.alt,
+        startTime: item?.startTime ?? item?.StartTime ?? item?.endTime ?? item?.EndTime ?? '',
+        idappXYZ: value
+      })
+
+      if (rows.length >= broadcastPositionLimit) return rows
+    }
+  }
+  return rows
+}
+
+function buildBroadcastPositionParams() {
+  return new URLSearchParams({
+    StartTime: broadcastStartTime.value,
+    EndTime: broadcastEndTime.value,
+    HasUl: 'false',
+    OnlyImei: 'false',
+    'Has定位经纬度': 'false',
+    'Has信令类型': 'false',
+    'Has播发经纬度': 'true',
+    'HasACARS': 'false',
+    'NotHasACARS': 'false',
+    'Has语音通话': 'false',
+    'Has短信数据': 'false',
+    'HasIP数据': 'false',
+    'Has低速数据': 'false',
+    'Has解析数据': 'false',
+    Count: String(broadcastPositionLimit)
+  })
+}
+
+async function handleBroadcastPositionQuery() {
+  if (!broadcastStartTime.value || !broadcastEndTime.value) return
+
+  loading.value = true
+  broadcastResultCount.value = null
+  try {
+    const params = buildBroadcastPositionParams()
+    const resp = await fetch(`/api/Result/SearchCommEvent?${params}`)
+    const text = await resp.text()
+    const result = text ? JSON.parse(text) : null
+    const rows = mapBroadcastPositionRowsForMap(result?.data || [])
+    broadcastResultCount.value = rows.length
+    updateBroadcastMapMarkers(rows)
+  } catch (err) {
+    console.error('查询播发位置失败:', err)
+    broadcastResultCount.value = 0
+    updateBroadcastMapMarkers([])
+  } finally {
+    loading.value = false
   }
 }
 

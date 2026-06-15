@@ -92,6 +92,36 @@
         <a-button size="small" @click="emit('export')">导出</a-button>
       </div>
     </div>
+
+    <div v-if="activeMenu === 4" class="map-controls-bar broadcast-controls-bar">
+      <div class="controls-row">
+        <input
+          type="datetime-local"
+          :value="broadcastStartTime"
+          @input="emit('update:broadcastStartTime', $event.target.value)"
+          class="native-datetime"
+          step="1"
+        />
+        <span style="color: #999; flex-shrink: 0">→</span>
+        <input
+          type="datetime-local"
+          :value="broadcastEndTime"
+          @input="emit('update:broadcastEndTime', $event.target.value)"
+          class="native-datetime"
+          step="1"
+        />
+        <a-input
+          :value="broadcastTerminalId"
+          @update:value="v => emit('update:broadcastTerminalId', v)"
+          placeholder="请输入终端ID"
+          style="width: 140px"
+          size="small"
+          allow-clear
+        />
+        <a-button type="primary" size="small" @click="emit('broadcast-query')">查询</a-button>
+        <span v-if="broadcastResultCount !== null" class="result-count">共 {{ broadcastResultCount }} 点</span>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -109,6 +139,10 @@ const props = defineProps({
   searchStartTime: { type: String, default: '' },
   searchEndTime: { type: String, default: '' },
   searchTerminalId: { type: String, default: '' },
+  broadcastStartTime: { type: String, default: '' },
+  broadcastEndTime: { type: String, default: '' },
+  broadcastTerminalId: { type: String, default: '' },
+  broadcastResultCount: { type: Number, default: null },
   loading: { type: Boolean, default: false },
 })
 
@@ -121,8 +155,12 @@ const emit = defineEmits([
   'update:searchStartTime',
   'update:searchEndTime',
   'update:searchTerminalId',
+  'update:broadcastStartTime',
+  'update:broadcastEndTime',
+  'update:broadcastTerminalId',
   'realtime-query',
   'search',
+  'broadcast-query',
   'export',
 ])
 
@@ -232,5 +270,14 @@ const countdownNumberStyle = {
 .native-datetime:focus {
   border-color: #1890ff;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+.broadcast-controls-bar {
+  max-width: calc(100% - 24px);
+}
+.result-count {
+  color: #1677ff;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 </style>

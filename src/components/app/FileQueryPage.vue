@@ -92,6 +92,12 @@
             <a-space>
               <a-button type="link" size="small" @click="emit('show-lcw-detail', record)">查看</a-button>
               <a-button type="link" size="small" @click="emit('export-lcw-detail', record)">导出</a-button>
+              <a-button
+                v-if="hasBroadcastPosition(record)"
+                type="link"
+                size="small"
+                @click="emit('open-broadcast-position-preview', record)"
+              >播发位置</a-button>
             </a-space>
           </template>
         </template>
@@ -168,6 +174,7 @@ const emit = defineEmits([
   'toggle-filter-dropdown',
   'open-payload-modal',
   'open-location-preview',
+  'open-broadcast-position-preview',
   'show-lcw-detail',
   'export-lcw-detail',
 ])
@@ -182,7 +189,7 @@ const antColumns = computed(() => {
     ellipsis: true,
     align: 'center',
   }))
-  cols.push({ title: '详情', key: 'actions', width: 120, noFilter: true, align: 'center' })
+  cols.push({ title: '详情', key: 'actions', width: 220, noFilter: true, align: 'center' })
   return cols
 })
 
@@ -200,6 +207,11 @@ function setPayloadFilterAircraft(checked) {
 function setPayloadFilterNoAcars(checked) {
   emit('update:payloadFilterNoAcars', checked)
   if (checked) emit('update:payloadFilterAircraft', false)
+}
+
+function hasBroadcastPosition(record) {
+  const values = record?.payloadData?.idappXYZ
+  return Array.isArray(values) ? values.length > 0 : Boolean(values)
 }
 </script>
 

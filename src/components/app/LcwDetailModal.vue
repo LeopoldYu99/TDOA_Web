@@ -17,7 +17,7 @@
         :pagination="{ pageSize: 100, size: 'small', showTotal: total => `共 ${total} 条`, showQuickJumper: true }"
         size="small"
         bordered
-        :scroll="{ x: 1940, y: 'calc(76vh - 120px)' }"
+        :scroll="{ x: 2110, y: 'calc(76vh - 120px)' }"
       >
         <template #headerCell="{ column }">
           <span>{{ column.title }}</span>

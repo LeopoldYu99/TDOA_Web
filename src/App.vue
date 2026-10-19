@@ -49,6 +49,7 @@
           @toggle-filter-dropdown="toggleFilterDropdown"
           @open-payload-modal="openPayloadModal"
           @open-location-preview="openLocationPreview"
+          @open-broadcast-position-preview="openBroadcastPositionPreview"
           @show-lcw-detail="showLCWDetail"
           @export-lcw-detail="handleLCWDetailExport"
         />
@@ -125,6 +126,14 @@
       map-id="locationPreviewMap"
       modal-class="location-preview-modal"
       @close="closeLocationPreview"
+    />
+
+    <MapModal
+      :visible="showBroadcastPreviewModal"
+      :title="`播发位置 - ${broadcastPreviewTitle}`"
+      map-id="broadcastPreviewMap"
+      modal-class="location-preview-modal"
+      @close="closeBroadcastPositionPreview"
     />
 
     <LcwDetailModal
@@ -235,6 +244,8 @@ const lcwDetailColumns = [
   { key: 'frequency', label: '频率', width: 110 },
   { key: 'imei', label: 'IMEI', width: 150 },
   { key: 'chn', label: '信道', width: 80 },
+  { key: 'sat', label: '卫星', width: 80 },
+  { key: 'cell', label: '波束号', width: 90 },
   { key: 'signaling', label: '信号类型', width: 220 },
   { key: 'frameType', label: '帧类型', width: 100 },
   { key: 'rawLine', label: '原始数据', width: 960, ellipsis: false },
@@ -268,6 +279,9 @@ let trajectoryMap = null
 const showLocationModal = ref(false)
 const locationPreviewLatLon = ref('')
 let locationPreviewMap = null
+const showBroadcastPreviewModal = ref(false)
+const broadcastPreviewTitle = ref('')
+let broadcastPreviewMap = null
 
 // 内容查询参数
 const fileQueryStartTime = ref('')
@@ -792,6 +806,73 @@ function closeLocationPreview() {
   }
 }
 
+function getBroadcastPositionRowsFromRecord(row) {
+  const values = toArr(row?.payloadData?.idappXYZ).slice(0, broadcastPositionLimit)
+  const rows = []
+  values.forEach((value, index) => {
+    const parsed = parseBroadcastLatLonText(value)
+    if (!parsed) return
+
+    rows.push({
+      chainID: row?.chainID || '',
+      imei: row?.imei || '',
+      latitude: parsed.lat,
+      longitude: parsed.lon,
+      altitude: parsed.alt,
+      displayTime: row?.startTime || '',
+      idappXYZ: value,
+      index: index + 1
+    })
+  })
+  return rows
+}
+
+function openBroadcastPositionPreview(row) {
+  const rows = getBroadcastPositionRowsFromRecord(row)
+  if (!rows.length) return
+
+  const identity = row?.chainID || row?.imei || `${rows.length}个点`
+  broadcastPreviewTitle.value = `${identity}（${rows.length}个点）`
+  showBroadcastPreviewModal.value = true
+
+  nextTick(() => {
+    if (broadcastPreviewMap) {
+      broadcastPreviewMap.remove()
+      broadcastPreviewMap = null
+    }
+
+    const latlngs = rows.map(item => toMapLatLng(item.latitude, item.longitude))
+    broadcastPreviewMap = L.map('broadcastPreviewMap', {
+      center: latlngs[0] || defaultMapCenter,
+      zoom: latlngs.length > 1 ? defaultMapZoom : 12,
+      zoomControl: true
+    })
+    addBaseTileLayer(broadcastPreviewMap)
+
+    rows.forEach((item, index) => {
+      const latlng = latlngs[index]
+      const marker = createBroadcastMarkerOnMap(broadcastPreviewMap, item, latlng[0], latlng[1])
+      if (index === 0) marker.openPopup()
+    })
+
+    if (latlngs.length > 1) {
+      broadcastPreviewMap.fitBounds(L.latLngBounds(latlngs).pad(0.2))
+    }
+
+    setTimeout(() => {
+      if (broadcastPreviewMap) broadcastPreviewMap.invalidateSize()
+    }, 120)
+  })
+}
+
+function closeBroadcastPositionPreview() {
+  showBroadcastPreviewModal.value = false
+  if (broadcastPreviewMap) {
+    broadcastPreviewMap.remove()
+    broadcastPreviewMap = null
+  }
+}
+
 function calcDuration(start, end) {
   if (!start || !end) return ''
   const ms = new Date(end) - new Date(start)
@@ -984,7 +1065,7 @@ function formatNumberCell(value, digits = 6) {
   return Number.isFinite(num) ? num.toFixed(digits) : String(value ?? '')
 }
 
-function createBroadcastSingleMarker(item, lat, lng) {
+function createBroadcastMarkerOnMap(targetMap, item, lat, lng) {
   const marker = L.circleMarker([lat, lng], {
     radius: 7,
     fillColor: '#fa8c16',
@@ -992,7 +1073,7 @@ function createBroadcastSingleMarker(item, lat, lng) {
     weight: 2,
     opacity: 1,
     fillOpacity: 0.88
-  }).addTo(map)
+  }).addTo(targetMap)
 
   const popupContent =
     `<div style="font-size:13px;line-height:1.8;min-width:210px;">` +
@@ -1002,12 +1083,16 @@ function createBroadcastSingleMarker(item, lat, lng) {
     `<div>纬度: ${escapeHtml(formatNumberCell(item.latitude))}</div>` +
     `<div>经度: ${escapeHtml(formatNumberCell(item.longitude))}</div>` +
     `<div>高度: ${escapeHtml(item.altitude !== '' && item.altitude !== null && item.altitude !== undefined ? `${formatNumberCell(item.altitude, 3)}m` : '-')}</div>` +
-    (item.startTime ? `<div>时间: ${escapeHtml(formatDisplayPlus8(item.startTime))}</div>` : '') +
+    (item.displayTime || item.startTime ? `<div>时间: ${escapeHtml(item.displayTime || formatDisplayPlus8(item.startTime))}</div>` : '') +
     `<div style="margin-top:4px;color:#666;">${escapeHtml(item.idappXYZ || '')}</div>` +
     `</div>`
 
   marker.bindPopup(popupContent)
   return marker
+}
+
+function createBroadcastSingleMarker(item, lat, lng) {
+  return createBroadcastMarkerOnMap(map, item, lat, lng)
 }
 
 // 展开聚合：移除聚合图标，在圆形范围内显示各终端标记
@@ -1175,10 +1260,18 @@ function mapLCWDetailRowsForUI(list) {
     frequency: item.frequncy ?? item.frequency ?? item.Frequency ?? item.Frequncy ?? '',
     imei: item.imei ?? item.Imei ?? item.IMEI ?? '',
     chn: item.chn ?? item.Chn ?? item.channel ?? item.Channel ?? '',
+    sat: normalizeOptionalLcwNumber(item.sat ?? item.Sat),
+    cell: normalizeOptionalLcwNumber(item.cell ?? item.Cell),
     signaling: item['信令类型'] ?? item.signaling ?? item.Signaling ?? '',
     frameType: item.frameType ?? item.FrameType ?? '',
     rawLine: item.rawLine ?? item.RawLine ?? ''
   }))
+}
+
+function normalizeOptionalLcwNumber(value) {
+  if (value === null || value === undefined || value === '') return ''
+  if (Number(value) === -1) return ''
+  return value
 }
 
 async function fetchLCWDetailRows(row) {
@@ -1461,6 +1554,10 @@ onUnmounted(() => {
   if (locationPreviewMap) {
     locationPreviewMap.remove()
     locationPreviewMap = null
+  }
+  if (broadcastPreviewMap) {
+    broadcastPreviewMap.remove()
+    broadcastPreviewMap = null
   }
 })
 
@@ -1812,6 +1909,7 @@ function extractPayloadData(item) {
     item?.['IsIP数据'] ??
     item?.['IP数据']
   return {
+    chainID: item.chainID ?? item.ChainID ?? '',
     commType:   toArr(item.commType),
     signaling:  toArr(item['信令类型']),
     tmsi:       normalizeTmsiValues(item.tmsi ?? item.Tmsi ?? item.TMSI),
@@ -1857,6 +1955,7 @@ function formatPayloadInfo(item) {
 }
 
 function mapCommEventRowForUI(item) {
+  const payloadData = extractPayloadData(item)
   return {
     deviceNumber: item.deviceNumber || '',
     dataCount: `${item.device1Count ?? 0} / ${item.device2Count ?? 0} / ${item.device3Count ?? 0}`,
@@ -1866,9 +1965,10 @@ function mapCommEventRowForUI(item) {
     isUl: getCommEventHasUl(item),
     imei: item.imei || '',
     payloadInfo: formatPayloadInfo(item),
-    payloadData: extractPayloadData(item),
+    payloadData,
     locationLatLon: formatLocationLatLon(item),
-    chainID: item.chainID || ''
+    chainID: item.chainID || '',
+    hasBroadcastLatLon: payloadData.idappXYZ.some(value => Boolean(parseBroadcastLatLonText(value)))
   }
 }
 
